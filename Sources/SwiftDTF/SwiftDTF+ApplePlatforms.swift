@@ -21,9 +21,9 @@ extension DataToFile {
         switch contentType {
         case .png:
             guard let imageData = UIImage(data: data) else { throw MediaSaverErrors.notSaved }
-            UIImageWriteToSavedPhotosAlbum(imageData, self, #selector(saveCompleted), nil)
+            UIImageWriteToSavedPhotosAlbum(imageData, self, nil, nil)
         case .movie:
-            UISaveVideoAtPathToSavedPhotosAlbum(videoPath, self, #selector(saveCompleted), nil)
+            UISaveVideoAtPathToSavedPhotosAlbum(videoPath, self, nil, nil)
         default:
             break
         }
@@ -41,13 +41,7 @@ extension DataToFile {
     }
     
 #if os(iOS)
-    @objc func saveCompleted(_ imageData: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) throws {
-        if let error = error {
-            throw error
-        } else {
-            print("Save finished!")
-        }
-    }
+
 #elseif os(macOS)
     
     @MainActor
