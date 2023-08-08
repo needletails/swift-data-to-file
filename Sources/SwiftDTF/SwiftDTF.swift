@@ -5,7 +5,7 @@ public actor DataToFile: Sendable {
     public static let shared = DataToFile()
     
     public enum FileType: String, Sendable {
-        case jpg, png, mov, m4v, mp4, mp3, pdf, txt, tiff, docC, pages
+        case jpg, png, mov, m4v, mp4, mp3, pdf, txt, tiff, docC, pages, document
     }
     
     private init() {
