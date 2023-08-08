@@ -3,11 +3,7 @@ import NIOCore
 
 public actor DataToFile: Sendable {
     public static let shared = DataToFile()
-    
-    public enum FileType: String, Sendable {
-        case jpg, png, mov, m4v, mp4, mp3, pdf, txt, tiff, docC, pages, document
-    }
-    
+
     private init() {
         
     }
@@ -19,7 +15,7 @@ public actor DataToFile: Sendable {
         filePath: String = "Media",
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask,
-        fileType: FileType
+        fileType: String
     ) async throws -> String {
         try await data.writeDataToFile(
             fileName: fileName,
@@ -35,7 +31,7 @@ public actor DataToFile: Sendable {
         filePath: String = "Media",
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask,
-        fileType: FileType
+        fileType: String
     ) async throws -> String {
         try await Data(binary).writeDataToFile(
             fileName: fileName,
@@ -51,7 +47,7 @@ public actor DataToFile: Sendable {
         filePath: String = "Media",
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask,
-        fileType: FileType
+        fileType: String
     ) async throws -> String {
         var byteBuffer = byteBuffer
         guard let bytes = byteBuffer.readBytes(length: byteBuffer.readableBytes) else { return "" }
@@ -85,7 +81,7 @@ public actor DataToFile: Sendable {
     
     public func removeItem(
         fileName: String,
-        fileType: DataToFile.FileType,
+        fileType: String,
         filePath: String = "Media",
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask
@@ -94,7 +90,7 @@ public actor DataToFile: Sendable {
         let paths = fm.urls(for: directory, in: domainMask)
         let documentsDirectory = paths[0]
         let saveDirectory = documentsDirectory.appendingPathComponent(filePath)
-        let file = saveDirectory.appendingPathComponent(fileName).appendingPathExtension(fileType.rawValue)
+        let file = saveDirectory.appendingPathComponent(fileName).appendingPathExtension(fileType)
         if fm.fileExists(atPath: saveDirectory.path) {
             try fm.removeItem(at: file)
         }
@@ -104,7 +100,7 @@ public actor DataToFile: Sendable {
 extension Data {
     func writeDataToFile(
         fileName: String = UUID().uuidString,
-        fileType: DataToFile.FileType,
+        fileType: String,
         filePath: String,
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask
@@ -118,7 +114,7 @@ extension Data {
             try? fm.createDirectory(at: saveDirectory, withIntermediateDirectories: true)
         }
         
-        let fileURL = saveDirectory.appendingPathComponent(fileName).appendingPathExtension(fileType.rawValue)
+        let fileURL = saveDirectory.appendingPathComponent(fileName).appendingPathExtension(fileType)
 
         print("Wrote data to file path: \(fileURL.path)")
         try write(to: fileURL, options: .atomic)
