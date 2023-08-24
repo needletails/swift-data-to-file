@@ -1,7 +1,7 @@
 import Foundation
 import NIOCore
 
-public actor DataToFile: Sendable {
+public struct DataToFile: Sendable {
     public static let shared = DataToFile()
 
     private init() {
@@ -16,8 +16,8 @@ public actor DataToFile: Sendable {
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask,
         fileType: String
-    ) async throws -> String {
-        try await data.writeDataToFile(
+    ) throws -> String {
+        try data.writeDataToFile(
             fileName: fileName,
             fileType: fileType,
             filePath: filePath
@@ -32,8 +32,8 @@ public actor DataToFile: Sendable {
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask,
         fileType: String
-    ) async throws -> String {
-        try await Data(binary).writeDataToFile(
+    ) throws -> String {
+        try Data(binary).writeDataToFile(
             fileName: fileName,
             fileType: fileType,
             filePath: filePath
@@ -48,17 +48,17 @@ public actor DataToFile: Sendable {
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask,
         fileType: String
-    ) async throws -> String {
+    ) throws -> String {
         var byteBuffer = byteBuffer
         guard let bytes = byteBuffer.readBytes(length: byteBuffer.readableBytes) else { return "" }
-        return try await Data(bytes).writeDataToFile(
+        return try Data(bytes).writeDataToFile(
             fileName: fileName,
             fileType: fileType,
             filePath: filePath
         )
        }
     
-    public func generateData(from filePath: String) async throws -> Data? {
+    public func generateData(from filePath: String) throws -> Data? {
         let fm = FileManager.default
         let paths = fm.urls(for: .documentDirectory, in: .userDomainMask)
         let documentsDirectory = paths[0]
@@ -85,7 +85,7 @@ public actor DataToFile: Sendable {
         filePath: String = "Media",
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask
-    ) async throws {
+    ) throws {
         let fm = FileManager.default
         let paths = fm.urls(for: directory, in: domainMask)
         let documentsDirectory = paths[0]
@@ -104,7 +104,7 @@ extension Data {
         filePath: String,
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask
-    ) async throws -> String {
+    ) throws -> String {
         let fm = FileManager.default
         let paths = fm.urls(for: directory, in: domainMask)
         let documentsDirectory = paths[0]
