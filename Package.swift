@@ -16,7 +16,7 @@ let package = Package(
             targets: ["SwiftDTF"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio.git", exact: "2.56.0"),
+        .package(url: "https://github.com/apple/swift-nio.git", .upToNextMajor(from: "2.58.0")),
         .package(url: "https://github.com/needle-tail/needletail-media-kit.git", branch: "main")
     ],
     targets: [
