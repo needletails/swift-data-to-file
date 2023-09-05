@@ -17,7 +17,7 @@ import NeedletailMediaKit
 #endif
 
 extension DataToFile {
-    
+#if os(iOS) || os(macOS)
     public func writeToPhotoAlbum(data: Data, videoPath: String = "", contentType: AllowedContentTypes = .png) async throws {
 #if os(iOS)
         switch contentType {
@@ -37,7 +37,7 @@ extension DataToFile {
         }
 #endif
     }
-    
+#endif
     private enum MediaSaverErrors: Error {
         case notSaved
     }
