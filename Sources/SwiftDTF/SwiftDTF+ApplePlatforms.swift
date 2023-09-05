@@ -11,8 +11,10 @@ import UIKit
 import Cocoa
 import AppKit
 #endif
+#if os(iOS) || os(macOS)
 import UniformTypeIdentifiers
 import NeedletailMediaKit
+#endif
 
 extension DataToFile {
     
