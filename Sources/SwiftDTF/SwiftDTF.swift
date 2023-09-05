@@ -3,7 +3,7 @@ import NIOCore
 
 public struct DataToFile: Sendable {
     public static let shared = DataToFile()
-
+    
     private init() {
         
     }
@@ -38,7 +38,7 @@ public struct DataToFile: Sendable {
             fileType: fileType,
             filePath: filePath
         )
-       }
+    }
     
     public func generateFile(
         byteBuffer: ByteBuffer,
@@ -56,9 +56,10 @@ public struct DataToFile: Sendable {
             fileType: fileType,
             filePath: filePath
         )
-       }
+    }
     
     public func generateData(from filePath: String) throws -> Data? {
+#if os(macOS) || os(iOS)
         let fm = FileManager.default
         let paths = fm.urls(for: .documentDirectory, in: .userDomainMask)
         let documentsDirectory = paths[0]
@@ -67,7 +68,6 @@ public struct DataToFile: Sendable {
         let fileName = filePath.components(separatedBy: "/").last
         guard let seperatedFileName =  fileName?.components(separatedBy: ".") else { return nil }
         let fileURL = saveDirectory.appendingPathComponent(seperatedFileName[0]).appendingPathExtension("\(seperatedFileName[1])")
-
         let fileData = try Data(contentsOf: fileURL, options: .alwaysMapped)
         guard let outputStream = OutputStream(url: URL(filePath: NSTemporaryDirectory()), append: true) else { return nil }
         defer { outputStream.close() }
@@ -75,8 +75,11 @@ public struct DataToFile: Sendable {
         _ = fileData.withUnsafeBytes { bytes in
             outputStream.write(bytes.bindMemory(to: UInt8.self).baseAddress!, maxLength: bytes.count)
         }
-        
         return fileData
+#else
+        return Data()
+#endif
+        
     }
     
     public func removeItem(
@@ -86,6 +89,7 @@ public struct DataToFile: Sendable {
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask
     ) throws {
+#if os(macOS) || os(iOS)
         let fm = FileManager.default
         let paths = fm.urls(for: directory, in: domainMask)
         let documentsDirectory = paths[0]
@@ -94,6 +98,7 @@ public struct DataToFile: Sendable {
         if fm.fileExists(atPath: saveDirectory.path) {
             try fm.removeItem(at: file)
         }
+#endif
     }
 }
 
@@ -105,6 +110,7 @@ extension Data {
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask
     ) throws -> String {
+#if os(macOS) || os(iOS)
         let fm = FileManager.default
         let paths = fm.urls(for: directory, in: domainMask)
         let documentsDirectory = paths[0]
@@ -115,9 +121,12 @@ extension Data {
         }
         
         let fileURL = saveDirectory.appendingPathComponent(fileName).appendingPathExtension(fileType)
-
+        
         print("Wrote data to file path: \(fileURL.path)")
         try write(to: fileURL, options: .atomic)
         return fileURL.path
+#else
+        return ""
+#endif
     }
 }
