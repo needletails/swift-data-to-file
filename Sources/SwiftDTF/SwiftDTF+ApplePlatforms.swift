@@ -96,6 +96,7 @@ extension DataToFile {
 #endif
 }
 
-public enum AllowedContentTypes {
+public enum AllowedContentTypes: String {
     case data, jpeg, appleProtectedMPEG4Audio, appleProtectedMPEG4Video, epub, pdf, png, mp3, movie
+    case quicktimeMovie = "com.apple.quicktime-movie"
 }
