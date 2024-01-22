@@ -4,8 +4,10 @@ import NIOCore
 public struct DataToFile: Sendable {
     public static let shared = DataToFile()
     
-    private init() {
-        
+    private init() {}
+    
+    public enum Errors: Error {
+        case fileComponenteTooSmall
     }
     
     public func generateFile(
@@ -67,15 +69,23 @@ public struct DataToFile: Sendable {
         
         let fileName = filePath.components(separatedBy: "/").last
         guard let seperatedFileName =  fileName?.components(separatedBy: ".") else { return nil }
-        let fileURL = saveDirectory.appendingPathComponent(seperatedFileName[0]).appendingPathExtension("\(seperatedFileName[1])")
-        let fileData = try Data(contentsOf: fileURL, options: .alwaysMapped)
-        guard let outputStream = OutputStream(url: URL(filePath: NSTemporaryDirectory()), append: true) else { return nil }
-        defer { outputStream.close() }
-        
-        _ = fileData.withUnsafeBytes { bytes in
-            outputStream.write(bytes.bindMemory(to: UInt8.self).baseAddress!, maxLength: bytes.count)
+
+        if seperatedFileName.count == 1 {
+            throw Errors.fileComponenteTooSmall
+        } else {
+            guard let name = seperatedFileName.first else { fatalError("File Name Does Not Exist") }
+            guard let type = seperatedFileName.last else { fatalError("File Type Does Not Exist") }
+            let fileURL = saveDirectory.appendingPathComponent(name).appendingPathExtension(type)
+            let fileData = try Data(contentsOf: fileURL, options: .alwaysMapped)
+            guard let outputStream = OutputStream(url: URL(filePath: NSTemporaryDirectory()), append: true) else { return nil }
+            
+            defer { outputStream.close() }
+            
+            _ = fileData.withUnsafeBytes { bytes in
+                outputStream.write(bytes.bindMemory(to: UInt8.self).baseAddress!, maxLength: bytes.count)
+            }
+            return fileData
         }
-        return fileData
 #else
         return Data()
 #endif
@@ -92,7 +102,7 @@ public struct DataToFile: Sendable {
 #if os(macOS) || os(iOS)
         let fm = FileManager.default
         let paths = fm.urls(for: directory, in: domainMask)
-        let documentsDirectory = paths[0]
+        guard let documentsDirectory = paths.first else { fatalError("Path Not Found") }
         let saveDirectory = documentsDirectory.appendingPathComponent(filePath)
         let file = saveDirectory.appendingPathComponent(fileName).appendingPathExtension(fileType)
         if fm.fileExists(atPath: saveDirectory.path) {
@@ -113,7 +123,7 @@ extension Data {
 #if os(macOS) || os(iOS)
         let fm = FileManager.default
         let paths = fm.urls(for: directory, in: domainMask)
-        let documentsDirectory = paths[0]
+        guard let documentsDirectory = paths.first else { fatalError("Path Not Found") }
         let saveDirectory = documentsDirectory.appendingPathComponent(filePath)
         
         if !fm.fileExists(atPath: saveDirectory.path) {
