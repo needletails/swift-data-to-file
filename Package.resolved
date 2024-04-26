@@ -1,13 +1,13 @@
 {
-  "originHash" : "05ca3dccec7b75d0d49322c868ed554cf64bc1353c4396338d179ee8be8470d9",
+  "originHash" : "4e46d14d172bc3a55b10543868a80c9f29d156f8d848e7ac408cb7565a5058a4",
   "pins" : [
     {
       "identity" : "needletail-media-kit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/needle-tail/needletail-media-kit.git",
+      "location" : "git@github.com:needle-tail/needletail-media-kit.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "aba47b829404cb2e4b7c3e4f28e0ae1d5db09877"
+        "revision" : "7572f018d406631f965793b75bc93f2e8ee9ba3d",
+        "version" : "1.0.0"
       }
     },
     {
