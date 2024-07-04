@@ -24,7 +24,7 @@ extension DataToFile {
         case .png:
             guard let imageData = UIImage(data: data) else { throw MediaSaverErrors.notSaved }
             UIImageWriteToSavedPhotosAlbum(imageData, self, nil, nil)
-        case .movie:
+        case .mov:
             UISaveVideoAtPathToSavedPhotosAlbum(videoPath, self, nil, nil)
         default:
             break
@@ -97,6 +97,54 @@ extension DataToFile {
 }
 
 public enum AllowedContentTypes: String {
-    case data, jpeg, appleProtectedMPEG4Audio, appleProtectedMPEG4Video, epub, pdf, png, mp3, movie
+    case data, jpeg, appleProtectedMPEG4Audio, appleProtectedMPEG4Video, epub, pdf, png, mp3, mov
     case quicktimeMovie = "com.apple.quicktime-movie"
+    
+    public var pathExtension: String {
+        switch self {
+        case .data:
+            return "data"
+        case .jpeg:
+            return "jpeg"
+        case .appleProtectedMPEG4Audio:
+            return "m4a"
+        case .appleProtectedMPEG4Video:
+            return "m4v"
+        case .epub:
+            return "epub"
+        case .pdf:
+            return "pdf"
+        case .png:
+            return "png"
+        case .mp3:
+            return "mp3"
+        case .mov, .quicktimeMovie:
+            return "mov"
+        }
+    }
+    
+    public init?(rawValue: String) {
+        switch rawValue {
+        case "data":
+            self = .data
+        case "jpeg":
+            self = .jpeg
+        case "appleProtectedMPEG4Audio":
+            self = .appleProtectedMPEG4Audio
+        case "appleProtectedMPEG4Video":
+            self = .appleProtectedMPEG4Video
+        case "epub":
+            self = .epub
+        case "pdf":
+            self = .pdf
+        case "png":
+            self = .png
+        case "mp3":
+            self = .mp3
+        case "mov", "quicktimeMovie":
+            self = .mov
+        default:
+            self = .png
+        }
+    }
 }
