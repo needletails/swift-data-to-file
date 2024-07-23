@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version:5.10
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -17,7 +17,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", .upToNextMajor(from: "2.65.0")),
-        .package(url: "git@github.com:needle-tail/needletail-media-kit.git", .upToNextMajor(from: "1.0.2")),
+        .package(url: "git@github.com:needle-tail/needletail-media-kit.git", .upToNextMajor(from: "1.0.3")),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
