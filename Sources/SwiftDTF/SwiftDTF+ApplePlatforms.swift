@@ -83,7 +83,7 @@ extension DataToFile {
             } catch {
                 throw error
             }
-        case .movie:
+        case .mov:
             do {
                 try data.write(to: path, options: .atomic)
             } catch {
