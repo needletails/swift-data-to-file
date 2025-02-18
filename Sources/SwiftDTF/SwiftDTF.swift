@@ -110,6 +110,36 @@ public struct DataToFile: Sendable {
         }
 #endif
     }
+    
+    public func removeAllItems(
+        filePath: String = "Media",
+        directory: FileManager.SearchPathDirectory = .documentDirectory,
+        domainMask: FileManager.SearchPathDomainMask = .userDomainMask
+    ) throws {
+    #if os(macOS) || os(iOS)
+        let fm = FileManager.default
+        let paths = fm.urls(for: directory, in: domainMask)
+        guard let documentsDirectory = paths.first else { fatalError("Path Not Found") }
+        let saveDirectory = documentsDirectory.appendingPathComponent(filePath)
+
+        // Check if the directory exists
+        if fm.fileExists(atPath: saveDirectory.path) {
+            // Get the contents of the directory
+            let items = try fm.contentsOfDirectory(atPath: saveDirectory.path)
+
+            // Iterate through each item and delete it
+            for item in items {
+                let itemPath = saveDirectory.appendingPathComponent(item)
+                try fm.removeItem(at: itemPath)
+                print("Deleted: \(itemPath)")
+            }
+            
+            print("All items deleted successfully from \(saveDirectory.path).")
+        } else {
+            print("Directory does not exist: \(saveDirectory.path)")
+        }
+    #endif
+    }
 }
 
 extension Data {
@@ -127,13 +157,17 @@ extension Data {
         let saveDirectory = documentsDirectory.appendingPathComponent(filePath)
         
         if !fm.fileExists(atPath: saveDirectory.path) {
-            try? fm.createDirectory(at: saveDirectory, withIntermediateDirectories: true)
+            try fm.createDirectory(at: saveDirectory, withIntermediateDirectories: true)
         }
         
         let fileURL = saveDirectory.appendingPathComponent(fileName).appendingPathExtension(fileType)
         
-        print("Wrote data to file path: \(fileURL.path)")
         try write(to: fileURL, options: .atomic)
+        if fm.fileExists(atPath: fileURL.path) {
+            print("Wrote data to file path: \(fileURL.path)")
+        } else {
+            print("File not writen when returned")
+        }
         return fileURL.path
 #else
         return ""

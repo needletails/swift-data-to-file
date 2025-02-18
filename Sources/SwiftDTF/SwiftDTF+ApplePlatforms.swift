@@ -13,7 +13,7 @@ import AppKit
 #endif
 #if os(iOS) || os(macOS)
 import UniformTypeIdentifiers
-import NeedletailMediaKit
+import NeedleTailMediaKit
 #endif
 
 extension DataToFile {
@@ -21,7 +21,7 @@ extension DataToFile {
     public func writeToPhotoAlbum(data: Data, videoPath: String = "", contentType: AllowedContentTypes = .png) async throws {
 #if os(iOS)
         switch contentType {
-        case .png:
+        case .png, .jpeg, .jpg:
             guard let imageData = UIImage(data: data) else { throw MediaSaverErrors.notSaved }
             UIImageWriteToSavedPhotosAlbum(imageData, self, nil, nil)
         case .mov:
@@ -97,13 +97,15 @@ extension DataToFile {
 }
 
 public enum AllowedContentTypes: String {
-    case data, jpeg, appleProtectedMPEG4Audio, appleProtectedMPEG4Video, epub, pdf, png, mp3, mov
+    case data, jpeg, jpg, appleProtectedMPEG4Audio, appleProtectedMPEG4Video, epub, pdf, png, mp3, mov
     case quicktimeMovie = "com.apple.quicktime-movie"
     
     public var pathExtension: String {
         switch self {
         case .data:
             return "data"
+        case .jpg:
+            return "jpg"
         case .jpeg:
             return "jpeg"
         case .appleProtectedMPEG4Audio:
@@ -127,6 +129,8 @@ public enum AllowedContentTypes: String {
         switch rawValue {
         case "data":
             self = .data
+        case "jpg":
+            self = .jpg
         case "jpeg":
             self = .jpeg
         case "appleProtectedMPEG4Audio":
