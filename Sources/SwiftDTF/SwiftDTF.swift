@@ -140,6 +140,28 @@ public struct DataToFile: Sendable {
         }
     #endif
     }
+    
+    public func removeAllItemsFromTempDirectory() throws {
+        let fileManager = FileManager.default
+        let tempDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
+
+        // Check if the temporary directory exists
+        if fileManager.fileExists(atPath: tempDirectory.path) {
+            // Get the contents of the temporary directory
+            let items = try fileManager.contentsOfDirectory(atPath: tempDirectory.path)
+
+            // Iterate through each item and delete it
+            for item in items {
+                let itemPath = tempDirectory.appendingPathComponent(item)
+                try fileManager.removeItem(at: itemPath)
+                print("Deleted: \(itemPath.lastPathComponent)")
+            }
+            
+            print("All items deleted successfully from \(tempDirectory.path).")
+        } else {
+            print("Temporary directory does not exist: \(tempDirectory.path)")
+        }
+    }
 }
 
 extension Data {
