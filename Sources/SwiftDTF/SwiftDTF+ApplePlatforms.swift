@@ -1,6 +1,6 @@
 //
 //  SwiftDTF+ApplePlatforms.swift
-//  
+//  SwiftDTF
 //
 //  Created by Cole M on 8/7/23.
 //
@@ -17,35 +17,66 @@ import NeedleTailMediaKit
 #endif
 
 extension DataToFile {
-#if os(iOS) || os(macOS)
-    public func writeToPhotoAlbum(data: Data, videoPath: String = "", contentType: AllowedContentTypes = .png) async throws {
-#if os(iOS)
+    #if os(iOS) || os(macOS)
+    /// Saves media data to the photo album (iOS) or shows a save panel (macOS)
+    ///
+    /// - Parameters:
+    ///   - data: The media data to save
+    ///   - videoPath: The path to the video file (used for iOS video saving)
+    ///   - contentType: The type of content being saved
+    /// - Throws: `MediaSaverErrors` if the operation fails
+    public func writeToPhotoAlbum(
+        data: Data, 
+        videoPath: String = "", 
+        contentType: AllowedContentTypes = .png
+    ) async throws {
+        #if os(iOS)
         switch contentType {
         case .png, .jpeg, .jpg:
-            guard let imageData = UIImage(data: data) else { throw MediaSaverErrors.notSaved }
+            guard let imageData = UIImage(data: data) else { 
+                throw MediaSaverErrors.notSaved 
+            }
             UIImageWriteToSavedPhotosAlbum(imageData, self, nil, nil)
         case .mov:
             UISaveVideoAtPathToSavedPhotosAlbum(videoPath, self, nil, nil)
         default:
-            break
+            throw MediaSaverErrors.unsupportedContentType
         }
-#elseif os(macOS)
+        #elseif os(macOS)
         if let mediaURL = await showSavePanel() {
             try await saveMedia(data: data, path: mediaURL, contentTypes: contentType)
         } else {
-            throw MediaSaverErrors.notSaved
+            throw MediaSaverErrors.cancelled
         }
-#endif
+        #endif
     }
-#endif
-    private enum MediaSaverErrors: Error {
+    #endif
+    
+    /// Errors that can occur during media saving operations
+    private enum MediaSaverErrors: LocalizedError {
         case notSaved
+        case unsupportedContentType
+        case cancelled
+        
+        public var errorDescription: String? {
+            switch self {
+            case .notSaved:
+                return "Failed to save media"
+            case .unsupportedContentType:
+                return "Unsupported content type"
+            case .cancelled:
+                return "Operation was cancelled"
+            }
+        }
     }
     
-#if os(iOS)
-
-#elseif os(macOS)
+    #if os(iOS)
+    // iOS-specific implementations can be added here
+    #elseif os(macOS)
     
+    /// Shows a save panel for selecting where to save media files
+    ///
+    /// - Returns: The selected URL or nil if cancelled
     @MainActor
     private func showSavePanel() -> URL? {
         let savePanel = NSSavePanel()
@@ -57,49 +88,63 @@ extension DataToFile {
         
         savePanel.canCreateDirectories = true
         savePanel.isExtensionHidden = false
-        savePanel.title = "Save your image"
-        savePanel.message = "Choose a folder and a name to store the image."
-        savePanel.nameFieldLabel = "Image file name:"
+        savePanel.title = "Save your media"
+        savePanel.message = "Choose a folder and a name to store the media file."
+        savePanel.nameFieldLabel = "File name:"
         
         let response = savePanel.runModal()
         return response == .OK ? savePanel.url : nil
     }
     
+    /// Saves media data to the specified path
+    ///
+    /// - Parameters:
+    ///   - data: The media data to save
+    ///   - path: The destination URL
+    ///   - contentTypes: The type of content being saved
+    /// - Throws: `MediaSaverErrors` if the operation fails
     private func saveMedia(data: Data, path: URL, contentTypes: AllowedContentTypes) async throws {
         switch contentTypes {
         case .jpeg:
-            guard let image = NSImage(data: data) else { throw MediaSaverErrors.notSaved }
-            guard let jpegData = image.jpegData(size: image.size) else { throw MediaSaverErrors.notSaved }
-            do {
-                try jpegData.write(to: path)
-            } catch {
-                throw error
+            guard let image = NSImage(data: data) else { 
+                throw MediaSaverErrors.notSaved 
             }
+            guard let jpegData = image.jpegData(maxSize: image.size) else { 
+                throw MediaSaverErrors.notSaved 
+            }
+            try jpegData.write(to: path)
         case .png:
-            guard let image = NSImage(data: data) else { throw MediaSaverErrors.notSaved }
-            guard let pngData = image.pngData(size: image.size) else { throw MediaSaverErrors.notSaved }
-            do {
-                try pngData.write(to: path)
-            } catch {
-                throw error
+            guard let image = NSImage(data: data) else { 
+                throw MediaSaverErrors.notSaved 
             }
+            guard let pngData = image.pngData(size: image.size) else { 
+                throw MediaSaverErrors.notSaved 
+            }
+            try pngData.write(to: path)
         case .mov:
-            do {
-                try data.write(to: path, options: .atomic)
-            } catch {
-                throw error
-            }
+            try data.write(to: path, options: .atomic)
         default:
-            break
+            throw MediaSaverErrors.unsupportedContentType
         }
     }
-#endif
+    #endif
 }
 
-public enum AllowedContentTypes: String {
-    case data, jpeg, jpg, appleProtectedMPEG4Audio, appleProtectedMPEG4Video, epub, pdf, png, mp3, mov
+/// Supported content types for media operations
+public enum AllowedContentTypes: String, CaseIterable {
+    case data
+    case jpeg
+    case jpg
+    case appleProtectedMPEG4Audio
+    case appleProtectedMPEG4Video
+    case epub
+    case pdf
+    case png
+    case mp3
+    case mov
     case quicktimeMovie = "com.apple.quicktime-movie"
     
+    /// The file extension for this content type
     public var pathExtension: String {
         switch self {
         case .data:
@@ -125,17 +170,20 @@ public enum AllowedContentTypes: String {
         }
     }
     
+    /// Creates an AllowedContentTypes from a raw string value
+    ///
+    /// - Parameter rawValue: The raw string value
     public init?(rawValue: String) {
-        switch rawValue {
+        switch rawValue.lowercased() {
         case "data":
             self = .data
         case "jpg":
             self = .jpg
         case "jpeg":
             self = .jpeg
-        case "appleProtectedMPEG4Audio":
+        case "appleprotectedmpeg4audio":
             self = .appleProtectedMPEG4Audio
-        case "appleProtectedMPEG4Video":
+        case "appleprotectedmpeg4video":
             self = .appleProtectedMPEG4Video
         case "epub":
             self = .epub
@@ -145,10 +193,17 @@ public enum AllowedContentTypes: String {
             self = .png
         case "mp3":
             self = .mp3
-        case "mov", "quicktimeMovie":
+        case "mov", "quicktimemovie":
             self = .mov
         default:
-            self = .png
+            return nil
         }
+    }
+    
+    /// Creates an AllowedContentTypes from a file extension
+    ///
+    /// - Parameter fileExtension: The file extension (without the dot)
+    public init?(fileExtension: String) {
+        self.init(rawValue: fileExtension)
     }
 }

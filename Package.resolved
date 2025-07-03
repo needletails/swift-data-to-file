@@ -1,6 +1,15 @@
 {
-  "originHash" : "e075d03e7576a24a2280ea45054ab14fbad3438df03a80ce328739eeff80fefd",
+  "originHash" : "83eb26f9e737a7dbdb34907e1050edda1830c0d30f9bc3415264ec827051a1e3",
   "pins" : [
+    {
+      "identity" : "needletail-media-kit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/needletails/needletail-media-kit.git",
+      "state" : {
+        "revision" : "c739b84b5a4bc3b49b082fa9f98c1e2a6e8a99c3",
+        "version" : "1.0.7"
+      }
+    },
     {
       "identity" : "swift-atomics",
       "kind" : "remoteSourceControl",
@@ -42,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/stasel/WebRTC.git",
       "state" : {
-        "revision" : "1048f8396529c10e259f8240d0c2cd607a13defd",
-        "version" : "130.0.0"
+        "revision" : "57c8881d4856f29a1fb809e9c084b7d72fce03fe",
+        "version" : "136.0.0"
       }
     }
   ],
