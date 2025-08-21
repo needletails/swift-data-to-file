@@ -15,6 +15,7 @@ import AppKit
 import UniformTypeIdentifiers
 import NeedleTailMediaKit
 #endif
+import Foundation
 
 extension DataToFile {
     #if os(iOS) || os(macOS)
