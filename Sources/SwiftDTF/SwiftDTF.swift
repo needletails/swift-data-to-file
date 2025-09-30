@@ -148,13 +148,42 @@ public struct DataToFile: Sendable {
         )
     }
     
+    /// Reads data from a local file URL and returns it directly
+    ///
+    /// - Parameter urlString: The local file URL string to read data from
+    /// - Returns: The file data
+    /// - Throws: `Errors` if the operation fails
+    public func generateDataFromURL(_ urlString: String) throws -> Data {
+        guard let url = URL(string: urlString) else {
+            throw Errors.invalidFilePath
+        }
+        
+        return try generateData(fromFileURL: url)
+    }
+
+    /// Reads data from a local file URL and returns it directly (URL overload)
+    ///
+    /// - Parameter url: The local file URL to read data from
+    /// - Returns: The file data
+    /// - Throws: `Errors` if the operation fails
+    public func generateData(fromFileURL url: URL) throws -> Data {
+        guard url.isFileURL else {
+            throw Errors.invalidFilePath
+        }
+        
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw Errors.fileNotFound
+        }
+        
+        return try Data(contentsOf: url, options: .alwaysMapped)
+    }
+    
     /// Reads data from a file and creates a temporary copy
     ///
     /// - Parameter filePath: The path to the file to read
     /// - Returns: A tuple containing the file data and temporary file URL
     /// - Throws: `Errors` if the operation fails
     public func generateData(from filePath: String) throws -> (data: Data?, tempFileURL: URL?) {
-    #if os(macOS) || os(iOS)
         let fm = FileManager.default
         let paths = fm.urls(for: .documentDirectory, in: .userDomainMask)
         guard let documentsDirectory = paths.first else { throw Errors.invalidFilePath }
@@ -182,7 +211,7 @@ public struct DataToFile: Sendable {
         let fileData = try Data(contentsOf: fileURL, options: .alwaysMapped)
         
         // Create a unique file name for the output in the temp directory
-        let tempFileURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("\(name)_temp.\(type)")
+        let tempFileURL = URL(fileURLWithPath: getTemporaryDirectory()).appendingPathComponent("\(name)_temp.\(type)")
         
         // Create an output stream to the temp file
         guard let outputStream = OutputStream(url: tempFileURL, append: false) else { 
@@ -202,9 +231,39 @@ public struct DataToFile: Sendable {
         }
         
         return (fileData, tempFileURL)
-    #else
-        throw Errors.invalidFilePath
-    #endif
+    }
+
+    /// Convenience: Reads data and stages a temp copy, using a file URL
+    /// - Parameter url: The local file URL to read
+    /// - Returns: Tuple of data and temp file URL
+    public func readDataAndStageTemp(fromFileURL url: URL) throws -> (data: Data, tempFileURL: URL) {
+        let data = try generateData(fromFileURL: url)
+        let name = url.deletingPathExtension().lastPathComponent
+        let type = url.pathExtension
+        let tempURL = URL(fileURLWithPath: getTemporaryDirectory()).appendingPathComponent("\(name)_temp.\(type)")
+        guard let outputStream = OutputStream(url: tempURL, append: false) else {
+            throw Errors.writeFailed
+        }
+        outputStream.open()
+        defer { outputStream.close() }
+        let bytesWritten = data.withUnsafeBytes { bytes in
+            outputStream.write(bytes.bindMemory(to: UInt8.self).baseAddress!, maxLength: bytes.count)
+        }
+        guard bytesWritten == data.count else {
+            throw Errors.writeFailed
+        }
+        return (data, tempURL)
+    }
+
+    /// Convenience: Reads data and stages a temp copy, using a relative file name
+    /// - Parameter path: The path component (e.g., "name.ext") under the default directory
+    /// - Returns: Tuple of data and temp file URL
+    public func readDataAndStageTemp(from path: String) throws -> (data: Data, tempFileURL: URL) {
+        let result = try generateData(from: path)
+        guard let data = result.data, let tempURL = result.tempFileURL else {
+            throw Errors.readFailed
+        }
+        return (data, tempURL)
     }
 
     /// Removes a specific file
@@ -223,7 +282,6 @@ public struct DataToFile: Sendable {
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask
     ) throws {
-    #if os(macOS) || os(iOS)
         let fm = FileManager.default
         let paths = fm.urls(for: directory, in: domainMask)
         guard let documentsDirectory = paths.first else { throw Errors.invalidFilePath }
@@ -235,7 +293,6 @@ public struct DataToFile: Sendable {
         }
         
         try fm.removeItem(at: file)
-    #endif
     }
     
     /// Removes all files from a directory
@@ -250,7 +307,6 @@ public struct DataToFile: Sendable {
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask
     ) throws {
-    #if os(macOS) || os(iOS)
         let fm = FileManager.default
         let paths = fm.urls(for: directory, in: domainMask)
         guard let documentsDirectory = paths.first else { throw Errors.invalidFilePath }
@@ -268,7 +324,6 @@ public struct DataToFile: Sendable {
             let itemPath = saveDirectory.appendingPathComponent(item)
             try fm.removeItem(at: itemPath)
         }
-    #endif
     }
     
     /// Removes a specific file from the temporary directory
@@ -277,7 +332,7 @@ public struct DataToFile: Sendable {
     /// - Throws: `Errors` if the operation fails
     public func removeItemFromTempDirectory(fileName: String) throws {
         let fileManager = FileManager.default
-        let tempDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
+        let tempDirectory = URL(fileURLWithPath: getTemporaryDirectory())
         let itemURL = tempDirectory.appendingPathComponent(fileName)
 
         guard fileManager.fileExists(atPath: itemURL.path) else {
@@ -292,7 +347,7 @@ public struct DataToFile: Sendable {
     /// - Throws: `Errors` if the operation fails
     public func removeAllItemsFromTempDirectory() throws {
         let fileManager = FileManager.default
-        let tempDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
+        let tempDirectory = URL(fileURLWithPath: getTemporaryDirectory())
 
         guard fileManager.fileExists(atPath: tempDirectory.path) else {
             throw Errors.fileNotFound
@@ -329,7 +384,6 @@ extension Data {
         directory: FileManager.SearchPathDirectory = .documentDirectory,
         domainMask: FileManager.SearchPathDomainMask = .userDomainMask
     ) throws -> String {
-    #if os(macOS) || os(iOS)
         guard !fileType.isEmpty else {
             throw DataToFile.Errors.fileTypeMissing
         }
@@ -352,9 +406,6 @@ extension Data {
         }
         
         return fileURL.path
-    #else
-        throw DataToFile.Errors.invalidFilePath
-    #endif
     }
     
     /// Writes data to a temporary file
@@ -368,13 +419,12 @@ extension Data {
         name: String,
         type: String
     ) throws -> String {
-    #if os(macOS) || os(iOS)
         guard !type.isEmpty else {
             throw DataToFile.Errors.fileTypeMissing
         }
         
         let fm = FileManager.default
-        let tempDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
+        let tempDirectory = URL(fileURLWithPath: getTemporaryDirectory())
         
         // Construct the file URL in the format: name_temp.type
         let fileURL = tempDirectory.appendingPathComponent("\(name)_temp.\(type)")
@@ -387,8 +437,80 @@ extension Data {
         }
         
         return fileURL.path
-    #else
-        throw DataToFile.Errors.invalidFilePath
-    #endif
     }
+
+    /// Writes data to a temporary file and returns the URL
+    /// - Parameters:
+    ///   - name: Base name for the temporary file
+    ///   - type: File extension/type
+    /// - Returns: The URL of the created temporary file
+    public func writeDataToTempFileURL(
+        name: String,
+        type: String
+    ) throws -> URL {
+        guard !type.isEmpty else {
+            throw DataToFile.Errors.fileTypeMissing
+        }
+        let tempDirectory = URL(fileURLWithPath: getTemporaryDirectory())
+        let fileURL = tempDirectory.appendingPathComponent("\(name)_temp.\(type)")
+        try write(to: fileURL, options: .atomic)
+        return fileURL
+    }
+}
+
+// MARK: - URL-first write overloads (non-breaking additions)
+
+extension DataToFile {
+    /// Writes data to a specified directory URL
+    /// - Parameters:
+    ///   - data: The data to write
+    ///   - directoryURL: Destination directory URL
+    ///   - name: File base name
+    ///   - fileExtension: File extension/type
+    /// - Returns: The destination file URL
+    public func generateFile(
+        data: Data,
+        to directoryURL: URL,
+        name: String = UUID().uuidString,
+        fileExtension: String
+    ) throws -> URL {
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: directoryURL.path) {
+            try fm.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        }
+        let dest = directoryURL.appendingPathComponent(name).appendingPathExtension(fileExtension)
+        try data.write(to: dest, options: .atomic)
+        return dest
+    }
+}
+
+// MARK: - Cross-Platform Helper Functions
+
+/// Returns the temporary directory path for the current platform
+/// - Returns: The temporary directory path as a string
+private func getTemporaryDirectory() -> String {
+    let fm = FileManager.default
+    // 1) Prefer Foundation-provided temporaryDirectory
+    let primary = fm.temporaryDirectory
+    if let values = try? primary.resourceValues(forKeys: [.isDirectoryKey]), values.isDirectory == true {
+        // Ensure it exists (best-effort)
+        if !fm.fileExists(atPath: primary.path) {
+            try? fm.createDirectory(at: primary, withIntermediateDirectories: true)
+        }
+        if fm.isWritableFile(atPath: primary.path) {
+            return primary.path
+        }
+    }
+
+    #if os(Android)
+    let fallback = URL(fileURLWithPath: "/data/local/tmp", isDirectory: true)
+    #elseif os(Linux)
+    let fallback = URL(fileURLWithPath: "/tmp", isDirectory: true)
+    #else
+    let fallback = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+    #endif
+    if !fm.fileExists(atPath: fallback.path) {
+        try? fm.createDirectory(at: fallback, withIntermediateDirectories: true)
+    }
+    return fallback.path
 }

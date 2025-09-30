@@ -138,6 +138,60 @@ import NIOCore
         }
     }
     
+    @Test("Generate data from local file URL")
+    func testGenerateDataFromLocalFileURL() throws {
+        // First create a test file
+        let testData = "Hello, World!".data(using: .utf8)!
+        let fileName = "url_test"
+        let fileType = "txt"
+        
+        let filePath = try dataToFile.generateFile(
+            data: testData,
+            fileName: fileName,
+            fileType: fileType
+        )
+        
+        // Convert to file URL
+        let fileURL = URL(fileURLWithPath: filePath)
+        let urlString = fileURL.absoluteString
+        
+        // Test reading from the file URL
+        let readData = try dataToFile.generateDataFromURL(urlString)
+        
+        #expect(!readData.isEmpty)
+        #expect(readData == testData)
+        
+        // Clean up
+        try dataToFile.removeItem(fileName: fileName, fileType: fileType)
+    }
+    
+    @Test("Generate data from non-existent file URL throws error")
+    func testGenerateDataFromNonExistentFileURL() throws {
+        let nonExistentURL = "file:///path/to/nonexistent/file.txt"
+        
+        #expect(throws: DataToFile.Errors.fileNotFound) {
+            try dataToFile.generateDataFromURL(nonExistentURL)
+        }
+    }
+    
+    @Test("Generate data from invalid URL throws error")
+    func testGenerateDataFromInvalidURL() throws {
+        let invalidURL = "not-a-valid-url"
+        
+        #expect(throws: DataToFile.Errors.invalidFilePath) {
+            try dataToFile.generateDataFromURL(invalidURL)
+        }
+    }
+    
+    @Test("Generate data from HTTP URL throws error")
+    func testGenerateDataFromHTTPURL() throws {
+        let httpURL = "https://example.com/file.txt"
+        
+        #expect(throws: DataToFile.Errors.invalidFilePath) {
+            try dataToFile.generateDataFromURL(httpURL)
+        }
+    }
+    
     @Test("Remove item")
     func testRemoveItem() throws {
         // Create a file
