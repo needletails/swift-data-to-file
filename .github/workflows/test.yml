@@ -86,17 +86,34 @@ jobs:
           source ~/.local/share/swiftly/env.sh
 
           SWIFT_SDK_ROOT="$HOME/.swiftpm/swift-sdks/${ANDROID_SDK_ID}.artifactbundle"
-          SETUP_SCRIPT="$SWIFT_SDK_ROOT/swift-android/scripts/setup-android-sdk.sh"
 
-          if [[ ! -f "$SETUP_SCRIPT" ]]; then
-            echo "Expected setup script not found: $SETUP_SCRIPT" >&2
-            echo "Installed SDKs:" >&2
-            swift sdk list || true
-            exit 1
+          # Older Android SDK bundles shipped a setup script at a fixed path.
+          # Newer bundles may move/rename it, or may not require it at all.
+          SETUP_SCRIPT_CANDIDATE="$SWIFT_SDK_ROOT/swift-android/scripts/setup-android-sdk.sh"
+          SETUP_SCRIPT=""
+
+          if [[ -f "$SETUP_SCRIPT_CANDIDATE" ]]; then
+            SETUP_SCRIPT="$SETUP_SCRIPT_CANDIDATE"
+          elif [[ -d "$SWIFT_SDK_ROOT" ]]; then
+            # Try to discover a suitable setup script in the bundle.
+            SETUP_SCRIPT=$(find "$SWIFT_SDK_ROOT" -type f \( \
+              -name 'setup-android-sdk.sh' -o \
+              -name 'setup-android-ndk.sh' -o \
+              -name 'setup-android*.sh' \
+            \) 2>/dev/null | head -n 1 || true)
           fi
 
-          export ANDROID_NDK_HOME
-          bash "$SETUP_SCRIPT"
+          echo "Installed SDKs:"
+          swift sdk list || true
+
+          if [[ -n "$SETUP_SCRIPT" && -f "$SETUP_SCRIPT" ]]; then
+            echo "Running Android SDK setup script: $SETUP_SCRIPT"
+            export ANDROID_NDK_HOME
+            bash "$SETUP_SCRIPT"
+          else
+            echo "No Android SDK setup script found in $SWIFT_SDK_ROOT; continuing without running one." >&2
+            echo "If Android builds fail, inspect bundle contents with: find '$SWIFT_SDK_ROOT' -maxdepth 4 -type f -name '*setup*'" >&2
+          fi
 
       - name: Swift version
         run: swift --version
