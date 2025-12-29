@@ -3,7 +3,7 @@
 A Swift library for handling data-to-file operations with support for various data types and platforms. SwiftDTF provides a simple, type-safe interface for writing data to files, managing file operations, and handling different data formats including `Data`, `[UInt8]`, and `ByteBuffer`.
 
 [![Swift](https://img.shields.io/badge/Swift-6.0+-orange.svg)](https://swift.org)
-[![Platform](https://img.shields.io/badge/Platform-iOS%2018%2B%20%7C%20macOS%2015%2B-blue.svg)](https://developer.apple.com)
+[![Platform](https://img.shields.io/badge/Platform-iOS%2018%2B%20%7C%20macOS%2015%2B%20%7C%20Linux%20%7C%20Android-blue.svg)](https://developer.apple.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Features
