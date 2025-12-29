@@ -16,8 +16,7 @@ let package = Package(
             targets: ["SwiftDTF"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.65.0"),
-        .package(url: "https://github.com/needletails/needletail-media-kit.git", from: "1.0.8"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.92.0"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -25,8 +24,7 @@ let package = Package(
         .target(
             name: "SwiftDTF",
             dependencies: [
-                .product(name: "NIOCore", package: "swift-nio"),
-                .product(name: "NeedleTailMediaKit", package: "needletail-media-kit")
+                .product(name: "NIOCore", package: "swift-nio")
             ]
         ),
         .testTarget(

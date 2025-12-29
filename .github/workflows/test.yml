@@ -1,0 +1,156 @@
+name: Test (SwiftDTF)
+
+on:
+  push:
+    paths:
+      - "Package.swift"
+      - "Package.resolved"
+      - "Sources/**"
+      - "Tests/**"
+      - "README.md"
+      - ".github/workflows/test.yml"
+  pull_request:
+    paths:
+      - "Package.swift"
+      - "Package.resolved"
+      - "Sources/**"
+      - "Tests/**"
+      - "README.md"
+      - ".github/workflows/test.yml"
+
+jobs:
+  test-linux-android:
+    name: swift test (linux) + build (android)
+    runs-on: ubuntu-latest
+    env:
+      HOST_TOOLCHAIN: main-snapshot-2025-12-17
+      ANDROID_SDK_URL: https://download.swift.org/development/android-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-12-17-a/swift-DEVELOPMENT-SNAPSHOT-2025-12-17-a_android.artifactbundle.tar.gz
+      ANDROID_SDK_CHECKSUM: 5b5cd4da30ececb28c678c3a17a922f3c5fdb82f0ff6dc777bd44275fcc222e0
+      ANDROID_SDK_ID: swift-DEVELOPMENT-SNAPSHOT-2025-12-17-a_android
+      ANDROID_NDK_VERSION: r27d
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install libcurl4-openssl-dev unzip
+
+      - name: Cache SwiftPM build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            .swiftpm
+          key: ${{ runner.os }}-linux-android-${{ env.HOST_TOOLCHAIN }}-${{ env.ANDROID_SDK_ID }}-${{ hashFiles('Package.swift', 'Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-linux-android-${{ env.HOST_TOOLCHAIN }}-${{ env.ANDROID_SDK_ID }}-
+
+      - name: Install Swift snapshot + Android Swift SDK + NDK
+        run: |
+          set -euo pipefail
+
+          # 1) Install Swiftly
+          curl -fsSLO "https://download.swift.org/swiftly/linux/swiftly-$(uname -m).tar.gz"
+          tar zxf "swiftly-$(uname -m).tar.gz"
+          ./swiftly init --quiet-shell-followup
+          source ~/.local/share/swiftly/env.sh
+
+          # 2) Install matching host toolchain.
+          swiftly install "$HOST_TOOLCHAIN"
+          swiftly use "$HOST_TOOLCHAIN"
+
+          # Ensure the selected toolchain is on PATH for this step as well
+          export PATH="$HOME/.local/share/swiftly/bin:$PATH"
+          swift --version
+
+          # Ensure Swift is available for later steps
+          echo "$HOME/.local/share/swiftly/bin" >> "$GITHUB_PATH"
+
+          # 3) Install the Swift SDK bundle for Android
+          swift sdk install "$ANDROID_SDK_URL" --checksum "$ANDROID_SDK_CHECKSUM"
+
+          # 4) Install Android NDK (required for cross-compilation)
+          mkdir -p "$HOME/android-ndk"
+          cd "$HOME/android-ndk"
+          NDK_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+          curl -fSLO "https://dl.google.com/android/repository/android-ndk-${ANDROID_NDK_VERSION}-${NDK_OS}.zip"
+          unzip -q "android-ndk-${ANDROID_NDK_VERSION}-"*.zip
+          echo "ANDROID_NDK_HOME=$HOME/android-ndk/android-ndk-${ANDROID_NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Configure Android NDK for Swift SDK
+        run: |
+          set -euo pipefail
+          source ~/.local/share/swiftly/env.sh
+
+          SWIFT_SDK_ROOT="$HOME/.swiftpm/swift-sdks/${ANDROID_SDK_ID}.artifactbundle"
+          SETUP_SCRIPT="$SWIFT_SDK_ROOT/swift-android/scripts/setup-android-sdk.sh"
+
+          if [[ ! -f "$SETUP_SCRIPT" ]]; then
+            echo "Expected setup script not found: $SETUP_SCRIPT" >&2
+            echo "Installed SDKs:" >&2
+            swift sdk list || true
+            exit 1
+          fi
+
+          export ANDROID_NDK_HOME
+          bash "$SETUP_SCRIPT"
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Swift SDKs
+        run: swift sdk list
+
+      - name: Test (linux)
+        run: swift test
+
+      - name: Build for Android (aarch64)
+        run: swift build --swift-sdk aarch64-unknown-linux-android28 --static-swift-stdlib
+
+      - name: Build for Android (x86_64)
+        if: ${{ github.event_name == 'pull_request' }}
+        run: swift build --swift-sdk x86_64-unknown-linux-android28 --static-swift-stdlib
+
+  test-macos:
+    name: swift test (macos)
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Swift (latest) with Swiftly
+        run: |
+          set -euo pipefail
+          curl -fsSLo swiftly.pkg "https://download.swift.org/swiftly/darwin/swiftly.pkg"
+          installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+
+          "$HOME/.swiftly/bin/swiftly" init --quiet-shell-followup
+          . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
+          swiftly install --use latest
+
+          # Ensure Swift is available for later steps
+          echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
+
+          # Capture installed Swift version for cache keys/logging
+          INSTALLED_VERSION=$(swift --version | awk '{print $3}' | head -1)
+          echo "SWIFT_VERSION=$INSTALLED_VERSION" >> "$GITHUB_ENV"
+
+      - name: Cache SwiftPM build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            .swiftpm
+          key: ${{ runner.os }}-swift-${{ env.SWIFT_VERSION }}-${{ hashFiles('Package.swift', 'Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-swift-${{ env.SWIFT_VERSION }}-
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Test
+        run: swift test

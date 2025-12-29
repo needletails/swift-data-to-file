@@ -3,6 +3,10 @@ import Foundation
 import NIOCore
 @testable import SwiftDTF
 
+#if os(macOS)
+import AppKit
+#endif
+
 @Suite struct SwiftDTFTests {
     let dataToFile = DataToFile.shared
     let testData = "Hello, World!".data(using: .utf8)!
@@ -353,6 +357,61 @@ import NIOCore
         #expect(AllowedContentTypes(fileExtension: "mov") == .mov)
         #expect(AllowedContentTypes(fileExtension: "invalid") == nil)
     }
+
+    #if os(macOS)
+    @Test("macOS: Encode PNG from NSImage")
+    func testMacOSEncodePNGFromNSImage() throws {
+        let image = makeTestImage1x1()
+        let data = _swiftDTFEncodePNG(image: image)
+
+        #expect(data != nil)
+        #expect(!(data ?? Data()).isEmpty)
+        #expect(NSImage(data: data!) != nil)
+    }
+
+    @Test("macOS: Encode JPEG from NSImage (quality clamping)")
+    func testMacOSEncodeJPEGFromNSImageQualityClamping() throws {
+        let image = makeTestImage1x1()
+
+        let low = _swiftDTFEncodeJPEG(image: image, quality: -1)
+        #expect(low != nil)
+        #expect(!(low ?? Data()).isEmpty)
+        #expect(NSImage(data: low!) != nil)
+
+        let high = _swiftDTFEncodeJPEG(image: image, quality: 2)
+        #expect(high != nil)
+        #expect(!(high ?? Data()).isEmpty)
+        #expect(NSImage(data: high!) != nil)
+    }
+
+    private func makeTestImage1x1() -> NSImage {
+        let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: 1,
+            pixelsHigh: 1,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        )
+
+        let image = NSImage(size: NSSize(width: 1, height: 1))
+        if let rep {
+            rep.size = NSSize(width: 1, height: 1)
+            if let bytes = rep.bitmapData {
+                bytes[0] = 255
+                bytes[1] = 0
+                bytes[2] = 0
+                bytes[3] = 255
+            }
+            image.addRepresentation(rep)
+        }
+        return image
+    }
+    #endif
     
     // MARK: - Helper Methods
     

@@ -13,6 +13,7 @@ A Swift library for handling data-to-file operations with support for various da
 - **File Management**: Create, read, and delete files with ease
 - **Temporary Files**: Built-in support for temporary file operations
 - **Media Support**: Save media files to photo album (iOS) or show save panel (macOS)
+- **URL-first APIs**: Read from file URLs and write to directory URLs
 - **Error Handling**: Comprehensive error handling with descriptive messages
 - **Type Safety**: Fully type-safe API with proper error handling
 
@@ -152,9 +153,25 @@ let customPath = try dataToFile.generateFile(
 // Write data to temporary file
 let tempPath = try data.writeDataToTempFile(name: "temp_example", type: "txt")
 print("Temporary file: \(tempPath)")
+
+// Or get the URL directly
+let tempURL = try data.writeDataToTempFileURL(name: "temp_example", type: "txt")
+print("Temporary file URL: \(tempURL)")
+
+// Write directly to a directory URL
+let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+let outputURL = try dataToFile.generateFile(
+    data: data,
+    to: documents.appendingPathComponent("Media"),
+    name: "example",
+    fileExtension: "txt"
+)
+print("Wrote file to: \(outputURL)")
 ```
 
 ### Media Operations (iOS/macOS)
+
+Note (iOS): Saving to the Photos library may require adding the appropriate usage description to your app's `Info.plist` (e.g. `NSPhotoLibraryAddUsageDescription`). Also, `writeToPhotoAlbum(...)` initiates the save using system APIs; it does not provide a completion callback for when the media is fully written.
 
 #### Saving to Photo Album (iOS)
 
@@ -256,15 +273,21 @@ The main struct providing file operations.
 - `generateFile(binary:fileName:filePath:directory:domainMask:fileType:)` - Write binary data to file
 - `generateFile(byteBuffer:fileName:filePath:directory:domainMask:fileType:)` - Write ByteBuffer to file
 - `generateData(from:)` - Read data from file
+- `generateDataFromURL(_:)` - Read data from a local `file://` URL string
+- `generateData(fromFileURL:)` - Read data from a local file URL
+- `readDataAndStageTemp(from:)` - Read data and stage a temp copy (relative path)
+- `readDataAndStageTemp(fromFileURL:)` - Read data and stage a temp copy (file URL)
 - `removeItem(fileName:fileType:filePath:directory:domainMask:)` - Remove specific file
 - `removeAllItems(filePath:directory:domainMask:)` - Remove all files from directory
 - `removeItemFromTempDirectory(fileName:)` - Remove specific temporary file
 - `removeAllItemsFromTempDirectory()` - Remove all temporary files
+- `generateFile(data:to:name:fileExtension:)` - Write data directly to a directory URL
 
 ### Data Extensions
 
 - `writeDataToFile(fileName:fileType:filePath:directory:domainMask:)` - Write Data to file
 - `writeDataToTempFile(name:type:)` - Write Data to temporary file
+- `writeDataToTempFileURL(name:type:)` - Write Data to a temporary file and return `URL`
 
 ### AllowedContentTypes
 
@@ -299,7 +322,7 @@ The test suite includes:
 - Unit tests for all public APIs
 - Error handling tests
 - Performance tests
-- Cross-platform compatibility tests
+- Platform compatibility tests
 
 ## Contributing
 

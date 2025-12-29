@@ -8,12 +8,10 @@
 #if os(iOS)
 import UIKit
 #elseif os(macOS)
-import Cocoa
 import AppKit
 #endif
 #if os(iOS) || os(macOS)
 import UniformTypeIdentifiers
-import NeedleTailMediaKit
 #endif
 import Foundation
 
@@ -38,7 +36,7 @@ extension DataToFile {
                 throw MediaSaverErrors.notSaved 
             }
             UIImageWriteToSavedPhotosAlbum(imageData, self, nil, nil)
-        case .mov:
+        case .mov, .quicktimeMovie:
             UISaveVideoAtPathToSavedPhotosAlbum(videoPath, self, nil, nil)
         default:
             throw MediaSaverErrors.unsupportedContentType
@@ -106,30 +104,49 @@ extension DataToFile {
     /// - Throws: `MediaSaverErrors` if the operation fails
     private func saveMedia(data: Data, path: URL, contentTypes: AllowedContentTypes) async throws {
         switch contentTypes {
-        case .jpeg:
+        case .jpeg, .jpg:
             guard let image = NSImage(data: data) else { 
                 throw MediaSaverErrors.notSaved 
             }
-            guard let jpegData = image.jpegData(maxSize: image.size) else { 
-                throw MediaSaverErrors.notSaved 
+            guard let jpegData = _swiftDTFEncodeJPEG(image: image, quality: 0.92) else {
+                throw MediaSaverErrors.notSaved
             }
-            try jpegData.write(to: path)
+            try jpegData.write(to: path, options: Data.WritingOptions.atomic)
         case .png:
             guard let image = NSImage(data: data) else { 
                 throw MediaSaverErrors.notSaved 
             }
-            guard let pngData = image.pngData(size: image.size) else { 
-                throw MediaSaverErrors.notSaved 
+            guard let pngData = _swiftDTFEncodePNG(image: image) else {
+                throw MediaSaverErrors.notSaved
             }
-            try pngData.write(to: path)
-        case .mov:
-            try data.write(to: path, options: .atomic)
+            try pngData.write(to: path, options: Data.WritingOptions.atomic)
+        case .mov, .quicktimeMovie:
+            try data.write(to: path, options: Data.WritingOptions.atomic)
         default:
             throw MediaSaverErrors.unsupportedContentType
         }
     }
     #endif
 }
+
+#if os(macOS)
+func _swiftDTFEncodePNG(image: NSImage) -> Data? {
+    guard let tiffData = image.tiffRepresentation,
+          let rep = NSBitmapImageRep(data: tiffData) else {
+        return nil
+    }
+    return rep.representation(using: .png, properties: [:])
+}
+
+func _swiftDTFEncodeJPEG(image: NSImage, quality: CGFloat) -> Data? {
+    let clampedQuality = max(0, min(1, quality))
+    guard let tiffData = image.tiffRepresentation,
+          let rep = NSBitmapImageRep(data: tiffData) else {
+        return nil
+    }
+    return rep.representation(using: .jpeg, properties: [.compressionFactor: clampedQuality])
+}
+#endif
 
 /// Supported content types for media operations
 public enum AllowedContentTypes: String, CaseIterable {
