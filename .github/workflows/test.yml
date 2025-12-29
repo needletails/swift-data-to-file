@@ -108,7 +108,18 @@ jobs:
           # Persist for later build steps.
           echo "ANDROID_NDK_SYSROOT=$SYSROOT" >> "$GITHUB_ENV"
 
-          SWIFT_SDK_ROOT="$HOME/.swiftpm/swift-sdks/${ANDROID_SDK_ID}.artifactbundle"
+          # SwiftPM's default SDK install location on Linux is typically:
+          #   ~/.config/swiftpm/swift-sdks
+          # but older setups used:
+          #   ~/.swiftpm/swift-sdks
+          SWIFT_SDKS_DIR="$HOME/.config/swiftpm/swift-sdks"
+          if [[ ! -d "$SWIFT_SDKS_DIR" ]]; then
+            SWIFT_SDKS_DIR="$HOME/.swiftpm/swift-sdks"
+          fi
+
+          echo "SWIFT_SDKS_DIR=$SWIFT_SDKS_DIR" >> "$GITHUB_ENV"
+
+          SWIFT_SDK_ROOT="$SWIFT_SDKS_DIR/${ANDROID_SDK_ID}.artifactbundle"
 
           # Older Android SDK bundles shipped a setup script at a fixed path.
           # Newer bundles may move/rename it, or may not require it at all.
@@ -136,6 +147,20 @@ jobs:
           else
             echo "No Android SDK setup script found in $SWIFT_SDK_ROOT; continuing without running one." >&2
             echo "If Android builds fail, inspect bundle contents with: find '$SWIFT_SDK_ROOT' -maxdepth 4 -type f -name '*setup*'" >&2
+          fi
+
+          # Some Swift Android SDK bundles expect a sysroot to exist at:
+          #   <bundle>/swift-android/ndk-sysroot
+          # If the helper script is missing or changed, create/update it ourselves.
+          SWIFT_ANDROID_DIR="$SWIFT_SDK_ROOT/swift-android"
+          if [[ ! -d "$SWIFT_ANDROID_DIR" ]]; then
+            SWIFT_ANDROID_DIR=$(find "$SWIFT_SDK_ROOT" -maxdepth 3 -type d -name swift-android 2>/dev/null | head -n 1 || true)
+          fi
+          if [[ -n "$SWIFT_ANDROID_DIR" && -d "$SWIFT_ANDROID_DIR" ]]; then
+            ln -sfn "$SYSROOT" "$SWIFT_ANDROID_DIR/ndk-sysroot"
+            echo "Ensured Swift Android bundle sysroot: $SWIFT_ANDROID_DIR/ndk-sysroot -> $SYSROOT"
+          else
+            echo "Warning: could not locate swift-android directory inside $SWIFT_SDK_ROOT" >&2
           fi
 
           # Configure the installed Swift Android SDK to use the NDK sysroot for C/Clang builds.
@@ -185,6 +210,7 @@ jobs:
           set -euo pipefail
           swift build \
             --swift-sdk aarch64-unknown-linux-android28 \
+            --swift-sdks-path "$SWIFT_SDKS_DIR" \
             --static-swift-stdlib \
             -Xcc --sysroot="$ANDROID_NDK_SYSROOT" \
             -Xcc -isystem -Xcc "$ANDROID_NDK_SYSROOT/usr/include" \
@@ -196,6 +222,7 @@ jobs:
           set -euo pipefail
           swift build \
             --swift-sdk x86_64-unknown-linux-android28 \
+            --swift-sdks-path "$SWIFT_SDKS_DIR" \
             --static-swift-stdlib \
             -Xcc --sysroot="$ANDROID_NDK_SYSROOT" \
             -Xcc -isystem -Xcc "$ANDROID_NDK_SYSROOT/usr/include" \
