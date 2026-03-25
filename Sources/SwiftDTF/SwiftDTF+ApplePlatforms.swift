@@ -149,7 +149,7 @@ func _swiftDTFEncodeJPEG(image: NSImage, quality: CGFloat) -> Data? {
 #endif
 
 /// Supported content types for media operations
-public enum AllowedContentTypes: String, CaseIterable {
+public enum AllowedContentTypes: String, CaseIterable, Sendable {
     case data
     case jpeg
     case jpg
@@ -158,7 +158,13 @@ public enum AllowedContentTypes: String, CaseIterable {
     case epub
     case pdf
     case png
+    case webp
+    case gif
+    case heic
     case mp3
+    case mp4
+    case m4v
+    case webm
     case mov
     case quicktimeMovie = "com.apple.quicktime-movie"
     
@@ -181,8 +187,20 @@ public enum AllowedContentTypes: String, CaseIterable {
             return "pdf"
         case .png:
             return "png"
+        case .webp:
+            return "webp"
+        case .gif:
+            return "gif"
+        case .heic:
+            return "heic"
         case .mp3:
             return "mp3"
+        case .mp4:
+            return "mp4"
+        case .m4v:
+            return "m4v"
+        case .webm:
+            return "webm"
         case .mov, .quicktimeMovie:
             return "mov"
         }
@@ -209,8 +227,20 @@ public enum AllowedContentTypes: String, CaseIterable {
             self = .pdf
         case "png":
             self = .png
+        case "webp":
+            self = .webp
+        case "gif":
+            self = .gif
+        case "heic", "heif":
+            self = .heic
         case "mp3":
             self = .mp3
+        case "mp4":
+            self = .mp4
+        case "m4v":
+            self = .m4v
+        case "webm":
+            self = .webm
         case "mov", "quicktimemovie":
             self = .mov
         default:
