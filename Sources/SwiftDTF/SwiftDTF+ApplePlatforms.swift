@@ -7,6 +7,7 @@
 
 #if os(iOS)
 import UIKit
+import Photos
 #elseif os(macOS)
 import AppKit
 #endif
@@ -31,13 +32,17 @@ extension DataToFile {
     ) async throws {
         #if os(iOS)
         switch contentType {
-        case .png, .jpeg, .jpg:
-            guard let imageData = UIImage(data: data) else { 
-                throw MediaSaverErrors.notSaved 
+        case .png, .jpeg, .jpg, .webp, .gif, .heic:
+            try await saveImageToPhotoLibrary(data, contentType: contentType)
+        case .mp4, .m4v, .mov, .quicktimeMovie, .appleProtectedMPEG4Video:
+            let videoURL = try videoFileURL(videoPath: videoPath, data: data, contentType: contentType)
+            let shouldRemoveTemp = videoURL.path.contains("_temp.")
+            defer {
+                if shouldRemoveTemp {
+                    try? FileManager.default.removeItem(at: videoURL)
+                }
             }
-            UIImageWriteToSavedPhotosAlbum(imageData, self, nil, nil)
-        case .mov, .quicktimeMovie:
-            UISaveVideoAtPathToSavedPhotosAlbum(videoPath, self, nil, nil)
+            try await saveVideoToPhotoLibrary(videoURL)
         default:
             throw MediaSaverErrors.unsupportedContentType
         }
@@ -56,6 +61,8 @@ extension DataToFile {
         case notSaved
         case unsupportedContentType
         case cancelled
+        case unauthorized
+        case invalidVideoFile
         
         public var errorDescription: String? {
             switch self {
@@ -65,12 +72,89 @@ extension DataToFile {
                 return "Unsupported content type"
             case .cancelled:
                 return "Operation was cancelled"
+            case .unauthorized:
+                return "Photo library access was not granted"
+            case .invalidVideoFile:
+                return "Video file is not available"
             }
         }
     }
     
     #if os(iOS)
-    // iOS-specific implementations can be added here
+    private func ensurePhotoAddAccess() async throws {
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        switch status {
+        case .authorized, .limited:
+            return
+        case .notDetermined:
+            let newStatus = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            guard newStatus == .authorized || newStatus == .limited else {
+                throw MediaSaverErrors.unauthorized
+            }
+        default:
+            throw MediaSaverErrors.unauthorized
+        }
+    }
+
+    private func saveImageToPhotoLibrary(_ data: Data, contentType: AllowedContentTypes) async throws {
+        try await ensurePhotoAddAccess()
+        guard UIImage(data: data) != nil else {
+            throw MediaSaverErrors.notSaved
+        }
+        try await performPhotoLibraryChanges {
+            let options = PHAssetResourceCreationOptions()
+            options.uniformTypeIdentifier = contentType.uniformTypeIdentifier
+            options.originalFilename = "Nudge_\(UUID().uuidString).\(contentType.pathExtension)"
+            PHAssetCreationRequest.forAsset().addResource(with: .photo, data: data, options: options)
+        }
+    }
+
+    private func saveVideoToPhotoLibrary(_ fileURL: URL) async throws {
+        try await ensurePhotoAddAccess()
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            throw MediaSaverErrors.invalidVideoFile
+        }
+        try await performPhotoLibraryChanges {
+            PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: fileURL)
+        }
+    }
+
+    private func videoFileURL(videoPath: String, data: Data, contentType: AllowedContentTypes) throws -> URL {
+        if let fileURL = normalizedFileURL(from: videoPath),
+           FileManager.default.fileExists(atPath: fileURL.path) {
+            return fileURL
+        }
+        return try data.writeDataToTempFileURL(
+            name: "SwiftDTF_\(UUID().uuidString)",
+            type: contentType.pathExtension
+        )
+    }
+
+    private func normalizedFileURL(from pathOrURLString: String) -> URL? {
+        let trimmed = pathOrURLString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if let url = URL(string: trimmed), url.isFileURL {
+            return url
+        }
+        if trimmed.hasPrefix("/file:/") {
+            return URL(fileURLWithPath: "/" + trimmed.dropFirst("/file:/".count))
+        }
+        return URL(fileURLWithPath: trimmed)
+    }
+
+    private func performPhotoLibraryChanges(_ changes: @escaping () -> Void) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            PHPhotoLibrary.shared().performChanges(changes) { success, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else if success {
+                    continuation.resume()
+                } else {
+                    continuation.resume(throwing: MediaSaverErrors.notSaved)
+                }
+            }
+        }
+    }
     #elseif os(macOS)
     
     /// Shows a save panel for selecting where to save media files
@@ -82,6 +166,11 @@ extension DataToFile {
         savePanel.allowedContentTypes = [
             .png,
             .jpeg,
+            .gif,
+            .heic,
+            .webP,
+            .mpeg4Movie,
+            .quickTimeMovie,
             .movie,
         ]
         
@@ -104,23 +193,7 @@ extension DataToFile {
     /// - Throws: `MediaSaverErrors` if the operation fails
     private func saveMedia(data: Data, path: URL, contentTypes: AllowedContentTypes) async throws {
         switch contentTypes {
-        case .jpeg, .jpg:
-            guard let image = NSImage(data: data) else { 
-                throw MediaSaverErrors.notSaved 
-            }
-            guard let jpegData = _swiftDTFEncodeJPEG(image: image, quality: 0.92) else {
-                throw MediaSaverErrors.notSaved
-            }
-            try jpegData.write(to: path, options: Data.WritingOptions.atomic)
-        case .png:
-            guard let image = NSImage(data: data) else { 
-                throw MediaSaverErrors.notSaved 
-            }
-            guard let pngData = _swiftDTFEncodePNG(image: image) else {
-                throw MediaSaverErrors.notSaved
-            }
-            try pngData.write(to: path, options: Data.WritingOptions.atomic)
-        case .mov, .quicktimeMovie:
+        case .jpeg, .jpg, .png, .webp, .gif, .heic, .mp4, .m4v, .mov, .quicktimeMovie, .appleProtectedMPEG4Video:
             try data.write(to: path, options: Data.WritingOptions.atomic)
         default:
             throw MediaSaverErrors.unsupportedContentType
@@ -205,6 +278,31 @@ public enum AllowedContentTypes: String, CaseIterable, Sendable {
             return "mov"
         }
     }
+
+    #if os(iOS)
+    var uniformTypeIdentifier: String {
+        switch self {
+        case .jpg, .jpeg:
+            return UTType.jpeg.identifier
+        case .png:
+            return UTType.png.identifier
+        case .webp:
+            return UTType.webP.identifier
+        case .gif:
+            return UTType.gif.identifier
+        case .heic:
+            return UTType.heic.identifier
+        case .mp4:
+            return UTType.mpeg4Movie.identifier
+        case .m4v, .appleProtectedMPEG4Video:
+            return "com.apple.m4v-video"
+        case .mov, .quicktimeMovie:
+            return UTType.quickTimeMovie.identifier
+        default:
+            return UTType.data.identifier
+        }
+    }
+    #endif
     
     /// Creates an AllowedContentTypes from a raw string value
     ///
