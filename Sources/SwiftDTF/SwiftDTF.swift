@@ -1,5 +1,8 @@
 import Foundation
 import NIOCore
+#if SKIP
+import SkipFoundation
+#endif
 
 /// A utility for handling data-to-file operations with support for various data types and platforms.
 ///
@@ -174,8 +177,14 @@ public struct DataToFile: Sendable {
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw Errors.fileNotFound
         }
-        
+
+#if SKIP
+        return try androidReadFileData(from: url)
+#elseif os(Android)
+        return try nativeAndroidReadFileData(from: url)
+#else
         return try Data(contentsOf: url, options: .alwaysMapped)
+#endif
     }
     
     /// Reads data from a file and creates a temporary copy
@@ -366,6 +375,105 @@ public struct DataToFile: Sendable {
 
 // MARK: - Data Extensions
 
+#if SKIP
+private func androidWriteFileData(_ data: Data, to fileURL: URL) throws {
+    let file = java.io.File(fileURL.path)
+    if let parent = file.getParentFile(), !parent.exists() {
+        guard parent.mkdirs() else {
+            throw DataToFile.Errors.writeFailed
+        }
+    }
+    let outputStream = java.io.FileOutputStream(file)
+    let bytes = data.platformValue
+    outputStream.write(bytes)
+    outputStream.flush()
+    outputStream.close()
+    guard file.exists(), file.length() == Int64(bytes.size) else {
+        throw DataToFile.Errors.writeFailed
+    }
+}
+
+private func androidReadFileData(from fileURL: URL) throws -> Data {
+    let file = java.io.File(fileURL.path)
+    guard file.exists() else {
+        throw DataToFile.Errors.fileNotFound
+    }
+    let inputStream = java.io.FileInputStream(file)
+    let outputStream = java.io.ByteArrayOutputStream()
+    inputStream.copyTo(outputStream)
+    inputStream.close()
+    return Data(platformValue: outputStream.toByteArray())
+}
+#elseif os(Android)
+private func nativeAndroidReadFileData(from fileURL: URL) throws -> Data {
+    let path = fileURL.path
+    guard FileManager.default.fileExists(atPath: path) else {
+        throw DataToFile.Errors.fileNotFound
+    }
+
+    if let handle = FileHandle(forReadingAtPath: path) {
+        defer { try? handle.close() }
+        let data = handle.readDataToEndOfFile()
+        if !data.isEmpty {
+            return data
+        }
+    }
+
+    if let data = FileManager.default.contents(atPath: path), !data.isEmpty {
+        return data
+    }
+
+    guard let stream = InputStream(url: fileURL) else {
+        throw DataToFile.Errors.readFailed
+    }
+    stream.open()
+    defer { stream.close() }
+
+    var buffer = Data()
+    let chunkSize = 64 * 1024
+    var chunk = [UInt8](repeating: 0, count: chunkSize)
+    while stream.hasBytesAvailable {
+        let read = stream.read(&chunk, maxLength: chunkSize)
+        if read <= 0 { break }
+        buffer.append(contentsOf: chunk.prefix(read))
+    }
+    guard !buffer.isEmpty else {
+        throw DataToFile.Errors.readFailed
+    }
+    return buffer
+}
+
+private func nativeAndroidWriteFileData(_ data: Data, to fileURL: URL) throws {
+    let path = fileURL.path
+    let parent = (path as NSString).deletingLastPathComponent
+    if !FileManager.default.fileExists(atPath: parent) {
+        try FileManager.default.createDirectory(atPath: parent, withIntermediateDirectories: true)
+    }
+
+    if FileManager.default.createFile(atPath: path, contents: data) {
+        if let written = FileManager.default.contents(atPath: path), written.count == data.count {
+            return
+        }
+    }
+
+    guard let stream = OutputStream(url: fileURL, append: false) else {
+        throw DataToFile.Errors.writeFailed
+    }
+    stream.open()
+    defer { stream.close() }
+
+    let wrote = data.withUnsafeBytes { rawBuffer in
+        guard let base = rawBuffer.bindMemory(to: UInt8.self).baseAddress else {
+            return false
+        }
+        return stream.write(base, maxLength: data.count) == data.count
+    }
+    guard wrote else {
+        throw DataToFile.Errors.writeFailed
+    }
+}
+#endif
+
 extension Data {
     /// Writes data to a file in the documents directory
     ///
@@ -399,7 +507,13 @@ extension Data {
         
         let fileURL = saveDirectory.appendingPathComponent(fileName).appendingPathExtension(fileType)
         
+#if SKIP
+        try androidWriteFileData(self, to: fileURL)
+#elseif os(Android)
+        try nativeAndroidWriteFileData(self, to: fileURL)
+#else
         try write(to: fileURL, options: .atomic)
+#endif
         
         guard fm.fileExists(atPath: fileURL.path) else {
             throw DataToFile.Errors.writeFailed
@@ -429,8 +543,13 @@ extension Data {
         // Construct the file URL in the format: name_temp.type
         let fileURL = tempDirectory.appendingPathComponent("\(name)_temp.\(type)")
         
-        // Write the data to the file
+#if SKIP
+        try androidWriteFileData(self, to: fileURL)
+#elseif os(Android)
+        try nativeAndroidWriteFileData(self, to: fileURL)
+#else
         try write(to: fileURL, options: .atomic)
+#endif
         
         guard fm.fileExists(atPath: fileURL.path) else {
             throw DataToFile.Errors.writeFailed
@@ -453,7 +572,13 @@ extension Data {
         }
         let tempDirectory = URL(fileURLWithPath: getTemporaryDirectory())
         let fileURL = tempDirectory.appendingPathComponent("\(name)_temp.\(type)")
+#if SKIP
+        try androidWriteFileData(self, to: fileURL)
+#elseif os(Android)
+        try nativeAndroidWriteFileData(self, to: fileURL)
+#else
         try write(to: fileURL, options: .atomic)
+#endif
         return fileURL
     }
 }
@@ -479,7 +604,13 @@ extension DataToFile {
             try fm.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         }
         let dest = directoryURL.appendingPathComponent(name).appendingPathExtension(fileExtension)
+#if SKIP
+        try androidWriteFileData(data, to: dest)
+#elseif os(Android)
+        try nativeAndroidWriteFileData(data, to: dest)
+#else
         try data.write(to: dest, options: .atomic)
+#endif
         return dest
     }
 }
