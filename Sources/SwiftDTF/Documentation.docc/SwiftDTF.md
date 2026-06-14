@@ -1,6 +1,6 @@
 # ``SwiftDTF``
 
-SwiftDTF is a Swift package for robust, type-safe data-to-file operations on Apple platforms. It supports writing and reading files from `Data`, `[UInt8]`, and `ByteBuffer`, and provides utilities for file management and media saving.
+SwiftDTF is a Swift package for robust, type-safe data-to-file operations. Its core file APIs are tested on macOS, iOS, and Linux; media-saving helpers are available on Apple platforms.
 
 ## Overview
 
@@ -19,7 +19,7 @@ SwiftDTF makes it easy to:
 - Remove temporary files
 - Save media to the photo album (iOS) or via a save panel (macOS)
 - Comprehensive error handling
-- Cross-platform: macOS and iOS
+- Cross-platform core file APIs: macOS, iOS, and Linux
 
 ## Usage
 

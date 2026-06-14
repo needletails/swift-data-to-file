@@ -3,13 +3,13 @@
 A Swift library for handling data-to-file operations with support for various data types and platforms. SwiftDTF provides a simple, type-safe interface for writing data to files, managing file operations, and handling different data formats including `Data`, `[UInt8]`, and `ByteBuffer`.
 
 [![Swift](https://img.shields.io/badge/Swift-6.0+-orange.svg)](https://swift.org)
-[![Platform](https://img.shields.io/badge/Platform-iOS%2018%2B%20%7C%20macOS%2015%2B-blue.svg)](https://developer.apple.com)
+[![Platform](https://img.shields.io/badge/Platform-iOS%2018%2B%20%7C%20macOS%2015%2B%20%7C%20Linux-blue.svg)](https://developer.apple.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Features
 
 - **Multiple Data Types**: Support for `Data`, `[UInt8]`, and `ByteBuffer`
-- **Cross-Platform**: Works on macOS and iOS
+- **Cross-Platform**: Core file APIs are tested on macOS, iOS, and Linux
 - **File Management**: Create, read, and delete files with ease
 - **Temporary Files**: Built-in support for temporary file operations
 - **Media Support**: Save media files to photo album (iOS) or show save panel (macOS)
@@ -20,7 +20,8 @@ A Swift library for handling data-to-file operations with support for various da
 ## Requirements
 
 - Swift 6.0+
-- macOS 15.0+ / iOS 18.0+
+- macOS 15.0+ / iOS 18.0+ for Apple-platform media APIs
+- Linux with Swift 6.0+ for core file APIs
 - Xcode 16.0+
 
 ## Installation
@@ -333,7 +334,8 @@ The test suite includes:
 - Unit tests for all public APIs
 - Error handling tests
 - Performance tests
-- Platform compatibility tests
+- macOS and Linux test gates
+- iOS simulator compile gate
 - Path traversal rejection, multi-dot file names, custom read folders, and scoped temp cleanup
 
 ## Contributing
@@ -364,7 +366,7 @@ If you encounter any issues or have questions, please:
 - Fixed multi-dot file name parsing
 - Rejected unsafe relative and absolute path components
 - Added opt-in scoped temporary cleanup for SwiftDTF-staged `*_temp.*` files
-- Added temp write verification, isolated tests, and an iOS simulator compile gate
+- Added temp write verification, isolated tests, macOS/Linux test gates, and an iOS simulator compile gate
 
 ### Version 1.0.0
 - Initial release
