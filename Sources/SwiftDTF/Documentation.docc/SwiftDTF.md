@@ -5,7 +5,7 @@ SwiftDTF is a Swift package for robust, type-safe data-to-file operations on App
 ## Overview
 
 SwiftDTF makes it easy to:
-- Write data to files in a safe, cross-platform way
+- Write data to files in a safe Apple-platform way
 - Read files and create temporary copies
 - Work with file URLs and directory URLs directly
 - Remove files and clean up directories
@@ -40,6 +40,8 @@ let filePath = try DataToFile.shared.generateFile(
 let (readData, tempURL) = try DataToFile.shared.generateData(from: "greeting.txt")
 ```
 
+Pass a file name to `generateData(from:)`, not a full filesystem path. To read from a custom folder, pass `inSubdirectory:` with the same relative folder used when writing.
+
 ### Removing a File
 
 ```swift
@@ -70,16 +72,17 @@ Note (iOS): Saving to the Photos library may require adding the appropriate usag
 - ``DataToFile/generateFile(data:fileName:filePath:directory:domainMask:fileType:)``
 - ``DataToFile/generateFile(binary:fileName:filePath:directory:domainMask:fileType:)``
 - ``DataToFile/generateFile(byteBuffer:fileName:filePath:directory:domainMask:fileType:)``
-- ``DataToFile/generateData(from:)``
+- ``DataToFile/generateData(from:inSubdirectory:directory:domainMask:)``
 - ``DataToFile/generateDataFromURL(_:)``
 - ``DataToFile/generateData(fromFileURL:)``
 - ``DataToFile/readDataAndStageTemp(fromFileURL:)``
-- ``DataToFile/readDataAndStageTemp(from:)``
+- ``DataToFile/readDataAndStageTemp(from:inSubdirectory:directory:domainMask:)``
 - ``DataToFile/generateFile(data:to:name:fileExtension:)``
 - ``DataToFile/removeItem(fileName:fileType:filePath:directory:domainMask:)``
 - ``DataToFile/removeAllItems(filePath:directory:domainMask:)``
 - ``DataToFile/removeItemFromTempDirectory(fileName:)``
 - ``DataToFile/removeAllItemsFromTempDirectory()``
+- ``DataToFile/removeAllSwiftDTFItemsFromTempDirectory()``
 
 ### Data Helpers
 - ``Data/writeDataToTempFile(name:type:)``
@@ -89,4 +92,4 @@ Note (iOS): Saving to the Photos library may require adding the appropriate usag
 - ``DataToFile/writeToPhotoAlbum(data:videoPath:contentType:)``
 
 ### Errors
-- ``DataToFile/Errors`` 
+- ``DataToFile/Errors``

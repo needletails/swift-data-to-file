@@ -3,7 +3,7 @@
 A Swift library for handling data-to-file operations with support for various data types and platforms. SwiftDTF provides a simple, type-safe interface for writing data to files, managing file operations, and handling different data formats including `Data`, `[UInt8]`, and `ByteBuffer`.
 
 [![Swift](https://img.shields.io/badge/Swift-6.0+-orange.svg)](https://swift.org)
-[![Platform](https://img.shields.io/badge/Platform-iOS%2018%2B%20%7C%20macOS%2015%2B%20%7C%20Linux%20%7C%20Android-blue.svg)](https://developer.apple.com)
+[![Platform](https://img.shields.io/badge/Platform-iOS%2018%2B%20%7C%20macOS%2015%2B-blue.svg)](https://developer.apple.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ## Features
@@ -21,7 +21,7 @@ A Swift library for handling data-to-file operations with support for various da
 
 - Swift 6.0+
 - macOS 15.0+ / iOS 18.0+
-- Xcode 15.0+
+- Xcode 16.0+
 
 ## Installation
 
@@ -104,7 +104,8 @@ let path3 = try dataToFile.generateFile(
 #### Reading Data from Files
 
 ```swift
-// Read data and create temporary copy
+// Read data and create a temporary copy from the default "Media" folder.
+// Pass a file name here, not a full filesystem path.
 let (data, tempURL) = try dataToFile.generateData(from: "example.txt")
 
 if let fileData = data {
@@ -131,6 +132,9 @@ try dataToFile.removeItemFromTempDirectory(fileName: "example_temp.txt")
 
 // Remove all temporary files
 try dataToFile.removeAllItemsFromTempDirectory()
+
+// Remove only SwiftDTF-staged temporary files matching *_temp.*
+try dataToFile.removeAllSwiftDTFItemsFromTempDirectory()
 ```
 
 ### Advanced Usage
@@ -144,6 +148,12 @@ let customPath = try dataToFile.generateFile(
     fileName: "custom",
     filePath: "MyApp/Documents",
     fileType: "txt"
+)
+
+// Read from the same custom directory without changing existing call sites.
+let (customData, customTempURL) = try dataToFile.generateData(
+    from: "custom.txt",
+    inSubdirectory: "MyApp/Documents"
 )
 ```
 
@@ -272,15 +282,16 @@ The main struct providing file operations.
 - `generateFile(data:fileName:filePath:directory:domainMask:fileType:)` - Write Data to file
 - `generateFile(binary:fileName:filePath:directory:domainMask:fileType:)` - Write binary data to file
 - `generateFile(byteBuffer:fileName:filePath:directory:domainMask:fileType:)` - Write ByteBuffer to file
-- `generateData(from:)` - Read data from file
+- `generateData(from:inSubdirectory:directory:domainMask:)` - Read data from a file name and stage a temp copy
 - `generateDataFromURL(_:)` - Read data from a local `file://` URL string
 - `generateData(fromFileURL:)` - Read data from a local file URL
-- `readDataAndStageTemp(from:)` - Read data and stage a temp copy (relative path)
+- `readDataAndStageTemp(from:inSubdirectory:directory:domainMask:)` - Read data and stage a temp copy (relative file name)
 - `readDataAndStageTemp(fromFileURL:)` - Read data and stage a temp copy (file URL)
 - `removeItem(fileName:fileType:filePath:directory:domainMask:)` - Remove specific file
 - `removeAllItems(filePath:directory:domainMask:)` - Remove all files from directory
 - `removeItemFromTempDirectory(fileName:)` - Remove specific temporary file
 - `removeAllItemsFromTempDirectory()` - Remove all temporary files
+- `removeAllSwiftDTFItemsFromTempDirectory()` - Remove SwiftDTF-staged temporary files matching `*_temp.*`
 - `generateFile(data:to:name:fileExtension:)` - Write data directly to a directory URL
 
 ### Data Extensions
@@ -323,6 +334,7 @@ The test suite includes:
 - Error handling tests
 - Performance tests
 - Platform compatibility tests
+- Path traversal rejection, multi-dot file names, custom read folders, and scoped temp cleanup
 
 ## Contributing
 
@@ -347,6 +359,13 @@ If you encounter any issues or have questions, please:
 
 ## Changelog
 
+### Version 1.1.0
+- Added backward-compatible custom read directory parameters to `generateData` and `readDataAndStageTemp`
+- Fixed multi-dot file name parsing
+- Rejected unsafe relative and absolute path components
+- Added opt-in scoped temporary cleanup for SwiftDTF-staged `*_temp.*` files
+- Added temp write verification, isolated tests, and an iOS simulator compile gate
+
 ### Version 1.0.0
 - Initial release
 - Support for Data, [UInt8], and ByteBuffer
@@ -354,4 +373,4 @@ If you encounter any issues or have questions, please:
 - Temporary file operations
 - Media saving for iOS and macOS
 - Comprehensive error handling
-- Full test coverage
+- Core API test coverage

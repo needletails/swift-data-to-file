@@ -41,11 +41,22 @@ if let data = readData {
 }
 ```
 
+Pass only a file name to `generateData(from:)`. If you wrote to a custom relative folder, pass that same folder with `inSubdirectory:`.
+
+```swift
+let (customData, customTempURL) = try DataToFile.shared.generateData(
+    from: "docc-example.txt",
+    inSubdirectory: "MyApp/Documents"
+)
+```
+
 ## Step 5: Remove a File
 
 ```swift
 try DataToFile.shared.removeItem(fileName: "docc-example", fileType: "txt")
 ```
+
+Use `removeAllSwiftDTFItemsFromTempDirectory()` when you want cleanup scoped to SwiftDTF-staged files that match `*_temp.*`.
 
 ## Next Steps
 

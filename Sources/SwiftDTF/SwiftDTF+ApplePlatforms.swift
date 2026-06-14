@@ -104,7 +104,7 @@ extension DataToFile {
         try await performPhotoLibraryChanges {
             let options = PHAssetResourceCreationOptions()
             options.uniformTypeIdentifier = contentType.uniformTypeIdentifier
-            options.originalFilename = "Nudge_\(UUID().uuidString).\(contentType.pathExtension)"
+            options.originalFilename = "SwiftDTF_\(UUID().uuidString).\(contentType.pathExtension)"
             PHAssetCreationRequest.forAsset().addResource(with: .photo, data: data, options: options)
         }
     }

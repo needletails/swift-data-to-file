@@ -21,13 +21,16 @@ on:
 jobs:
   test-macos:
     name: swift test (macos)
-    runs-on: macos-latest
+    runs-on: macos-15
+
+    env:
+      SWIFT_VERSION: "6.0.3"
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install Swift (latest) with Swiftly
+      - name: Install Swift with Swiftly
         run: |
           set -euo pipefail
           curl -fsSLo swiftly.pkg "https://download.swift.org/swiftly/darwin/swiftly.pkg"
@@ -35,7 +38,7 @@ jobs:
 
           "$HOME/.swiftly/bin/swiftly" init --quiet-shell-followup
           . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh"
-          swiftly install --use latest
+          swiftly install --use "$SWIFT_VERSION"
 
           # Ensure Swift is available for later steps
           echo "$HOME/.swiftly/bin" >> "$GITHUB_PATH"
@@ -59,3 +62,17 @@ jobs:
 
       - name: Test
         run: swift test
+
+  build-ios:
+    name: xcodebuild (ios simulator)
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build
+        run: xcodebuild -scheme swift-data-to-file -destination 'generic/platform=iOS Simulator' -derivedDataPath .build/xcodebuild build

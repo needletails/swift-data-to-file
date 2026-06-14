@@ -7,332 +7,473 @@ import NIOCore
 import AppKit
 #endif
 
-@Suite struct SwiftDTFTests {
+@Suite(.serialized) struct SwiftDTFTests {
     let dataToFile = DataToFile.shared
     let testData = "Hello, World!".data(using: .utf8)!
-    let testBinary: [UInt8] = [72, 101, 108, 108, 111] // "Hello"
-    
+    let testBinary: [UInt8] = [72, 101, 108, 108, 111]
+
     @Test("Generate file from Data")
     func testGenerateFileFromData() throws {
-        let fileName = "test_data"
-        let fileType = "txt"
-        
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
         let filePath = try dataToFile.generateFile(
             data: testData,
-            fileName: fileName,
-            fileType: fileType
+            fileName: "test_data",
+            filePath: subdirectory,
+            directory: .cachesDirectory,
+            fileType: "txt"
         )
-        
+
         #expect(!filePath.isEmpty)
         #expect(FileManager.default.fileExists(atPath: filePath))
-        
-        // Verify file contents
-        let savedData = try Data(contentsOf: URL(fileURLWithPath: filePath))
-        #expect(savedData == testData)
+        #expect(try Data(contentsOf: URL(fileURLWithPath: filePath)) == testData)
     }
-    
+
     @Test("Generate file from binary data")
     func testGenerateFileFromBinary() throws {
-        let fileName = "test_binary"
-        let fileType = "bin"
-        
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
         let filePath = try dataToFile.generateFile(
             binary: testBinary,
-            fileName: fileName,
-            fileType: fileType
+            fileName: "test_binary",
+            filePath: subdirectory,
+            directory: .cachesDirectory,
+            fileType: "bin"
         )
-        
+
         #expect(!filePath.isEmpty)
         #expect(FileManager.default.fileExists(atPath: filePath))
-        
-        // Verify file contents
-        let savedData = try Data(contentsOf: URL(fileURLWithPath: filePath))
-        #expect(savedData == Data(testBinary))
+        #expect(try Data(contentsOf: URL(fileURLWithPath: filePath)) == Data(testBinary))
     }
-    
+
     @Test("Generate file from ByteBuffer")
     func testGenerateFileFromByteBuffer() throws {
-        let fileName = "test_bytebuffer"
-        let fileType = "dat"
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
         var byteBuffer = ByteBuffer()
         byteBuffer.writeBytes(testBinary)
-        
+
         let filePath = try dataToFile.generateFile(
             byteBuffer: byteBuffer,
-            fileName: fileName,
-            fileType: fileType
+            fileName: "test_bytebuffer",
+            filePath: subdirectory,
+            directory: .cachesDirectory,
+            fileType: "dat"
         )
-        
+
         #expect(!filePath.isEmpty)
         #expect(FileManager.default.fileExists(atPath: filePath))
-        
-        // Verify file contents
-        let savedData = try Data(contentsOf: URL(fileURLWithPath: filePath))
-        #expect(savedData == Data(testBinary))
+        #expect(try Data(contentsOf: URL(fileURLWithPath: filePath)) == Data(testBinary))
     }
-    
+
     @Test("Generate file with custom path")
     func testGenerateFileWithCustomPath() throws {
-        let fileName = "custom_path_test"
-        let fileType = "txt"
-        let customPath = "CustomFolder"
-        
+        let subdirectory = uniqueSubdirectory().appending("/Nested")
+        defer { cleanup(rootTestDirectory(from: subdirectory)) }
+
         let filePath = try dataToFile.generateFile(
             data: testData,
-            fileName: fileName,
-            filePath: customPath,
-            fileType: fileType
+            fileName: "custom_path_test",
+            filePath: subdirectory,
+            directory: .cachesDirectory,
+            fileType: "txt"
         )
-        
+
         #expect(!filePath.isEmpty)
         #expect(FileManager.default.fileExists(atPath: filePath))
-        #expect(filePath.contains(customPath))
+        #expect(filePath.contains("Nested"))
     }
-    
+
     @Test("Generate file with UUID")
     func testGenerateFileWithUUID() throws {
-        let fileType = "txt"
-        
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
         let filePath = try dataToFile.generateFile(
             data: testData,
-            fileType: fileType
+            filePath: subdirectory,
+            directory: .cachesDirectory,
+            fileType: "txt"
         )
-        
+
         #expect(!filePath.isEmpty)
         #expect(FileManager.default.fileExists(atPath: filePath))
-        
-        // Verify UUID format in filename
+
         let fileName = URL(fileURLWithPath: filePath).lastPathComponent
-        let nameWithoutExtension = fileName.replacingOccurrences(of: ".\(fileType)", with: "")
-        #expect(nameWithoutExtension.count > 0)
+        let nameWithoutExtension = fileName.replacingOccurrences(of: ".txt", with: "")
+        #expect(!nameWithoutExtension.isEmpty)
     }
-    
+
     @Test("Generate data from file")
     func testGenerateDataFromFile() throws {
-        // First create a file
-        let fileName = "read_test"
-        let fileType = "txt"
-        
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
         _ = try dataToFile.generateFile(
             data: testData,
-            fileName: fileName,
-            fileType: fileType
+            fileName: "read_test",
+            filePath: subdirectory,
+            directory: .cachesDirectory,
+            fileType: "txt"
         )
-        
-        // Now read it back
-        let (readData, tempURL) = try dataToFile.generateData(from: "\(fileName).\(fileType)")
-        
-        #expect(readData != nil)
-        #expect(tempURL != nil)
+
+        let (readData, tempURL) = try dataToFile.generateData(
+            from: "read_test.txt",
+            inSubdirectory: subdirectory,
+            directory: .cachesDirectory
+        )
+
         #expect(readData == testData)
+        #expect(tempURL != nil)
         #expect(FileManager.default.fileExists(atPath: tempURL!.path))
     }
-    
+
+    @Test("Generate data handles multi-dot file names")
+    func testGenerateDataHandlesMultiDotFileNames() throws {
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
+        _ = try dataToFile.generateFile(
+            data: testData,
+            fileName: "archive.tar",
+            filePath: subdirectory,
+            directory: .cachesDirectory,
+            fileType: "gz"
+        )
+
+        let (readData, tempURL) = try dataToFile.generateData(
+            from: "archive.tar.gz",
+            inSubdirectory: subdirectory,
+            directory: .cachesDirectory
+        )
+
+        #expect(readData == testData)
+        #expect(tempURL?.lastPathComponent == "archive.tar_temp.gz")
+    }
+
+    @Test("Read data and stage temp supports custom subdirectories")
+    func testReadDataAndStageTempSupportsCustomSubdirectories() throws {
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
+        _ = try dataToFile.generateFile(
+            data: testData,
+            fileName: "custom_read",
+            filePath: subdirectory,
+            directory: .cachesDirectory,
+            fileType: "txt"
+        )
+
+        let result = try dataToFile.readDataAndStageTemp(
+            from: "custom_read.txt",
+            inSubdirectory: subdirectory,
+            directory: .cachesDirectory
+        )
+
+        #expect(result.data == testData)
+        #expect(FileManager.default.fileExists(atPath: result.tempFileURL.path))
+    }
+
     @Test("Generate data from non-existent file throws error")
     func testGenerateDataFromNonExistentFile() throws {
-        #expect(throws: DataToFile.Errors.self) {
-            try dataToFile.generateData(from: "nonexistent.txt")
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
+        #expect(throws: DataToFile.Errors.fileNotFound) {
+            try dataToFile.generateData(
+                from: "nonexistent.txt",
+                inSubdirectory: subdirectory,
+                directory: .cachesDirectory
+            )
         }
     }
-    
+
     @Test("Generate data with invalid filename throws error")
     func testGenerateDataWithInvalidFileName() throws {
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
         #expect(throws: DataToFile.Errors.fileComponentTooSmall) {
-            try dataToFile.generateData(from: "invalid")
+            try dataToFile.generateData(
+                from: "invalid",
+                inSubdirectory: subdirectory,
+                directory: .cachesDirectory
+            )
         }
     }
-    
+
+    @Test("Relative directory traversal is rejected")
+    func testRelativeDirectoryTraversalIsRejected() throws {
+        #expect(throws: DataToFile.Errors.invalidFilePath) {
+            try dataToFile.generateFile(
+                data: testData,
+                fileName: "escape",
+                filePath: "../escape",
+                directory: .cachesDirectory,
+                fileType: "txt"
+            )
+        }
+
+        #expect(throws: DataToFile.Errors.invalidFilePath) {
+            try dataToFile.generateData(
+                from: "escape.txt",
+                inSubdirectory: "../escape",
+                directory: .cachesDirectory
+            )
+        }
+    }
+
+    @Test("File component traversal is rejected")
+    func testFileComponentTraversalIsRejected() throws {
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
+        #expect(throws: DataToFile.Errors.invalidFilePath) {
+            try dataToFile.generateFile(
+                data: testData,
+                fileName: "../escape",
+                filePath: subdirectory,
+                directory: .cachesDirectory,
+                fileType: "txt"
+            )
+        }
+
+        #expect(throws: DataToFile.Errors.invalidFilePath) {
+            try dataToFile.removeItemFromTempDirectory(fileName: "../escape_temp.txt")
+        }
+    }
+
     @Test("Generate data from local file URL")
     func testGenerateDataFromLocalFileURL() throws {
-        // First create a test file
-        let testData = "Hello, World!".data(using: .utf8)!
-        let fileName = "url_test"
-        let fileType = "txt"
-        
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
         let filePath = try dataToFile.generateFile(
             data: testData,
-            fileName: fileName,
-            fileType: fileType
+            fileName: "url_test",
+            filePath: subdirectory,
+            directory: .cachesDirectory,
+            fileType: "txt"
         )
-        
-        // Convert to file URL
-        let fileURL = URL(fileURLWithPath: filePath)
-        let urlString = fileURL.absoluteString
-        
-        // Test reading from the file URL
-        let readData = try dataToFile.generateDataFromURL(urlString)
-        
+
+        let readData = try dataToFile.generateDataFromURL(URL(fileURLWithPath: filePath).absoluteString)
+
         #expect(!readData.isEmpty)
         #expect(readData == testData)
-        
-        // Clean up
-        try dataToFile.removeItem(fileName: fileName, fileType: fileType)
     }
-    
-    @Test("Generate data from non-existent file URL throws error")
-    func testGenerateDataFromNonExistentFileURL() throws {
-        let nonExistentURL = "file:///path/to/nonexistent/file.txt"
-        
-        #expect(throws: DataToFile.Errors.fileNotFound) {
-            try dataToFile.generateDataFromURL(nonExistentURL)
-        }
-    }
-    
-    @Test("Generate data from invalid URL throws error")
-    func testGenerateDataFromInvalidURL() throws {
-        let invalidURL = "not-a-valid-url"
-        
-        #expect(throws: DataToFile.Errors.invalidFilePath) {
-            try dataToFile.generateDataFromURL(invalidURL)
-        }
-    }
-    
-    @Test("Generate data from HTTP URL throws error")
-    func testGenerateDataFromHTTPURL() throws {
-        let httpURL = "https://example.com/file.txt"
-        
-        #expect(throws: DataToFile.Errors.invalidFilePath) {
-            try dataToFile.generateDataFromURL(httpURL)
-        }
-    }
-    
-    @Test("Remove item")
-    func testRemoveItem() throws {
-        // Create a file
-        let fileName = "remove_test"
-        let fileType = "txt"
-        
+
+    @Test("Read data and stage temp from local file URL")
+    func testReadDataAndStageTempFromLocalFileURL() throws {
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
         let filePath = try dataToFile.generateFile(
             data: testData,
-            fileName: fileName,
-            fileType: fileType
+            fileName: "stage_url_test",
+            filePath: subdirectory,
+            directory: .cachesDirectory,
+            fileType: "txt"
         )
-        
-        #expect(FileManager.default.fileExists(atPath: filePath))
-        
-        // Remove it
-        try dataToFile.removeItem(fileName: fileName, fileType: fileType)
-        
-        #expect(!FileManager.default.fileExists(atPath: filePath))
+
+        let result = try dataToFile.readDataAndStageTemp(fromFileURL: URL(fileURLWithPath: filePath))
+
+        #expect(result.data == testData)
+        #expect(result.tempFileURL.lastPathComponent == "stage_url_test_temp.txt")
+        #expect(FileManager.default.fileExists(atPath: result.tempFileURL.path))
     }
-    
-    @Test("Remove non-existent item throws error")
-    func testRemoveNonExistentItem() throws {
+
+    @Test("Read data and stage temp from extensionless local file URL")
+    func testReadDataAndStageTempFromExtensionlessLocalFileURL() throws {
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+        let directory = try cachesDirectory().appendingPathComponent(subdirectory, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let fileURL = directory.appendingPathComponent("extensionless")
+        try testData.write(to: fileURL, options: .atomic)
+
+        let result = try dataToFile.readDataAndStageTemp(fromFileURL: fileURL)
+        defer { try? FileManager.default.removeItem(at: result.tempFileURL) }
+
+        #expect(result.data == testData)
+        #expect(result.tempFileURL.lastPathComponent == "extensionless_temp.")
+        #expect(FileManager.default.fileExists(atPath: result.tempFileURL.path))
+    }
+
+    @Test("Generate data from non-existent file URL throws error")
+    func testGenerateDataFromNonExistentFileURL() throws {
         #expect(throws: DataToFile.Errors.fileNotFound) {
-            try dataToFile.removeItem(fileName: "nonexistent", fileType: "txt")
+            try dataToFile.generateDataFromURL("file:///path/to/nonexistent/file.txt")
         }
     }
-    
+
+    @Test("Generate data from invalid URL throws error")
+    func testGenerateDataFromInvalidURL() throws {
+        #expect(throws: DataToFile.Errors.invalidFilePath) {
+            try dataToFile.generateDataFromURL("not-a-valid-url")
+        }
+    }
+
+    @Test("Generate data from HTTP URL throws error")
+    func testGenerateDataFromHTTPURL() throws {
+        #expect(throws: DataToFile.Errors.invalidFilePath) {
+            try dataToFile.generateDataFromURL("https://example.com/file.txt")
+        }
+    }
+
+    @Test("Remove item")
+    func testRemoveItem() throws {
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
+        let filePath = try dataToFile.generateFile(
+            data: testData,
+            fileName: "remove_test",
+            filePath: subdirectory,
+            directory: .cachesDirectory,
+            fileType: "txt"
+        )
+
+        #expect(FileManager.default.fileExists(atPath: filePath))
+
+        try dataToFile.removeItem(
+            fileName: "remove_test",
+            fileType: "txt",
+            filePath: subdirectory,
+            directory: .cachesDirectory
+        )
+
+        #expect(!FileManager.default.fileExists(atPath: filePath))
+    }
+
+    @Test("Remove non-existent item throws error")
+    func testRemoveNonExistentItem() throws {
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
+        #expect(throws: DataToFile.Errors.fileNotFound) {
+            try dataToFile.removeItem(
+                fileName: "nonexistent",
+                fileType: "txt",
+                filePath: subdirectory,
+                directory: .cachesDirectory
+            )
+        }
+    }
+
     @Test("Remove all items")
     func testRemoveAllItems() throws {
-        // Create multiple files
-        let fileNames = ["test1", "test2", "test3"]
-        let fileType = "txt"
-        
-        for fileName in fileNames {
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+
+        for fileName in ["test1", "test2", "test3"] {
             _ = try dataToFile.generateFile(
                 data: testData,
                 fileName: fileName,
-                fileType: fileType
+                filePath: subdirectory,
+                directory: .cachesDirectory,
+                fileType: "txt"
             )
         }
-        
-        // Remove only our specific test files instead of all items
-        for fileName in fileNames {
-            try dataToFile.removeItem(fileName: fileName, fileType: fileType)
-        }
-        
-        // Verify all our test files are removed
-        for fileName in fileNames {
-            let filePath = try getDocumentsDirectory().appendingPathComponent("Media").appendingPathComponent(fileName).appendingPathExtension(fileType)
-            #expect(!FileManager.default.fileExists(atPath: filePath.path))
+
+        try dataToFile.removeAllItems(filePath: subdirectory, directory: .cachesDirectory)
+
+        for fileName in ["test1", "test2", "test3"] {
+            let fileURL = try cachedFileURL(subdirectory: subdirectory, fileName: fileName, fileType: "txt")
+            #expect(!FileManager.default.fileExists(atPath: fileURL.path))
         }
     }
-    
+
     @Test("Write data to temp file")
     func testWriteDataToTempFile() throws {
-        let name = "temp_test"
-        let type = "txt"
-        
-        let tempFilePath = try testData.writeDataToTempFile(name: name, type: type)
-        
+        let tempFilePath = try testData.writeDataToTempFile(name: "temp_test_\(UUID().uuidString)", type: "txt")
+        defer { try? FileManager.default.removeItem(atPath: tempFilePath) }
+
         #expect(!tempFilePath.isEmpty)
         #expect(FileManager.default.fileExists(atPath: tempFilePath))
-        
-        // Verify file contents
-        let savedData = try Data(contentsOf: URL(fileURLWithPath: tempFilePath))
-        #expect(savedData == testData)
+        #expect(try Data(contentsOf: URL(fileURLWithPath: tempFilePath)) == testData)
     }
-    
+
+    @Test("Write data to temp file URL verifies existence")
+    func testWriteDataToTempFileURL() throws {
+        let tempFileURL = try testData.writeDataToTempFileURL(name: "temp_url_test_\(UUID().uuidString)", type: "txt")
+        defer { try? FileManager.default.removeItem(at: tempFileURL) }
+
+        #expect(FileManager.default.fileExists(atPath: tempFileURL.path))
+        #expect(try Data(contentsOf: tempFileURL) == testData)
+    }
+
     @Test("Remove item from temp directory")
     func testRemoveItemFromTempDirectory() throws {
-        let name = "temp_remove_test"
-        let type = "txt"
-        
-        let tempFilePath = try testData.writeDataToTempFile(name: name, type: type)
+        let tempFilePath = try testData.writeDataToTempFile(name: "temp_remove_test_\(UUID().uuidString)", type: "txt")
         #expect(FileManager.default.fileExists(atPath: tempFilePath))
-        
-        let fileName = URL(fileURLWithPath: tempFilePath).lastPathComponent
-        try dataToFile.removeItemFromTempDirectory(fileName: fileName)
-        
+
+        try dataToFile.removeItemFromTempDirectory(fileName: URL(fileURLWithPath: tempFilePath).lastPathComponent)
+
         #expect(!FileManager.default.fileExists(atPath: tempFilePath))
     }
-    
-    @Test("Remove all items from temp directory")
-    func testRemoveAllItemsFromTempDirectory() throws {
-        // Create multiple temp files with our specific naming pattern
-        let names = ["temp1", "temp2", "temp3"]
-        let type = "txt"
-        var tempFilePaths: [String] = []
-        
-        for name in names {
-            let tempFilePath = try testData.writeDataToTempFile(name: name, type: type)
-            tempFilePaths.append(tempFilePath)
-        }
-        
-        // Verify files exist
-        for path in tempFilePaths {
-            #expect(FileManager.default.fileExists(atPath: path))
-        }
-        
-        // Remove only our specific temp files
-        for path in tempFilePaths {
-            let fileName = URL(fileURLWithPath: path).lastPathComponent
-            try? dataToFile.removeItemFromTempDirectory(fileName: fileName)
-        }
-        
-        // Verify our files are removed
-        for path in tempFilePaths {
-            #expect(!FileManager.default.fileExists(atPath: path))
-        }
+
+    @Test("Remove all SwiftDTF items from temp directory only removes staged files")
+    func testRemoveAllSwiftDTFItemsFromTempDirectoryOnlyRemovesSwiftDTFFiles() throws {
+        let tempFileURL1 = try testData.writeDataToTempFileURL(name: "temp_scope_\(UUID().uuidString)", type: "txt")
+        let tempFileURL2 = try testData.writeDataToTempFileURL(name: "temp_scope_\(UUID().uuidString)", type: "txt")
+        let unrelatedURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("SwiftDTF_unrelated_\(UUID().uuidString).txt")
+        try testData.write(to: unrelatedURL, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: unrelatedURL) }
+
+        try dataToFile.removeAllSwiftDTFItemsFromTempDirectory()
+
+        #expect(!FileManager.default.fileExists(atPath: tempFileURL1.path))
+        #expect(!FileManager.default.fileExists(atPath: tempFileURL2.path))
+        #expect(FileManager.default.fileExists(atPath: unrelatedURL.path))
     }
-    
+
     @Test("ByteBuffer read failure throws error")
     func testByteBufferReadFailure() throws {
         let emptyBuffer = ByteBuffer()
-        // Don't write anything to the buffer
-        
+
         #expect(throws: DataToFile.Errors.readFailed) {
             try dataToFile.generateFile(
                 byteBuffer: emptyBuffer,
                 fileName: "test",
+                filePath: uniqueSubdirectory(),
+                directory: .cachesDirectory,
                 fileType: "txt"
             )
         }
     }
-    
+
     @Test("Data write failure throws error")
     func testDataWriteFailure() throws {
-        // Test with empty file type which should cause an error
         #expect(throws: DataToFile.Errors.fileTypeMissing) {
             try testData.writeDataToFile(
                 fileName: "test",
                 fileType: "",
-                filePath: "Media"
+                filePath: uniqueSubdirectory(),
+                directory: .cachesDirectory
             )
         }
     }
-    
+
+    @Test("URL-first write validates and writes")
+    func testURLFirstWriteValidatesAndWrites() throws {
+        let directory = try cachesDirectory().appendingPathComponent(uniqueSubdirectory(), isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let fileURL = try dataToFile.generateFile(
+            data: testData,
+            to: directory,
+            name: "url_first",
+            fileExtension: "txt"
+        )
+
+        #expect(FileManager.default.fileExists(atPath: fileURL.path))
+        #expect(try Data(contentsOf: fileURL) == testData)
+    }
+
     @Test("AllowedContentTypes path extension")
     func testAllowedContentTypesPathExtension() {
         #expect(AllowedContentTypes.png.pathExtension == "png")
@@ -340,7 +481,7 @@ import AppKit
         #expect(AllowedContentTypes.mov.pathExtension == "mov")
         #expect(AllowedContentTypes.pdf.pathExtension == "pdf")
     }
-    
+
     @Test("AllowedContentTypes from raw value")
     func testAllowedContentTypesFromRawValue() {
         #expect(AllowedContentTypes(rawValue: "png") == .png)
@@ -349,13 +490,61 @@ import AppKit
         #expect(AllowedContentTypes(rawValue: "mov") == .mov)
         #expect(AllowedContentTypes(rawValue: "invalid") == nil)
     }
-    
+
     @Test("AllowedContentTypes from file extension")
     func testAllowedContentTypesFromFileExtension() {
         #expect(AllowedContentTypes(fileExtension: "png") == .png)
         #expect(AllowedContentTypes(fileExtension: "jpeg") == .jpeg)
         #expect(AllowedContentTypes(fileExtension: "mov") == .mov)
         #expect(AllowedContentTypes(fileExtension: "invalid") == nil)
+    }
+
+    @Test("Performance test for file generation")
+    func testPerformanceGenerateFile() throws {
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+        let largeData = Data(repeating: 0, count: 1024 * 1024)
+
+        let startTime = Date()
+        for index in 0..<10 {
+            _ = try dataToFile.generateFile(
+                data: largeData,
+                fileName: "performance_test_\(index)",
+                filePath: subdirectory,
+                directory: .cachesDirectory,
+                fileType: "dat"
+            )
+        }
+        let duration = Date().timeIntervalSince(startTime)
+
+        #expect(duration < 5.0)
+    }
+
+    @Test("Performance test for data generation")
+    func testPerformanceGenerateData() throws {
+        let subdirectory = uniqueSubdirectory()
+        defer { cleanup(subdirectory) }
+        let largeData = Data(repeating: 0, count: 1024 * 1024)
+
+        _ = try dataToFile.generateFile(
+            data: largeData,
+            fileName: "performance_read_test",
+            filePath: subdirectory,
+            directory: .cachesDirectory,
+            fileType: "dat"
+        )
+
+        let startTime = Date()
+        for _ in 0..<10 {
+            _ = try dataToFile.generateData(
+                from: "performance_read_test.dat",
+                inSubdirectory: subdirectory,
+                directory: .cachesDirectory
+            )
+        }
+        let duration = Date().timeIntervalSince(startTime)
+
+        #expect(duration < 5.0)
     }
 
     #if os(macOS)
@@ -369,7 +558,7 @@ import AppKit
         #expect(NSImage(data: data!) != nil)
     }
 
-    @Test("macOS: Encode JPEG from NSImage (quality clamping)")
+    @Test("macOS: Encode JPEG from NSImage quality clamping")
     func testMacOSEncodeJPEGFromNSImageQualityClamping() throws {
         let image = makeTestImage1x1()
 
@@ -412,69 +601,33 @@ import AppKit
         return image
     }
     #endif
-    
-    // MARK: - Helper Methods
-    
-    private func getDocumentsDirectory() throws -> URL {
-        let fm = FileManager.default
-        let paths = fm.urls(for: .documentDirectory, in: .userDomainMask)
-        guard let documentsDirectory = paths.first else {
+
+    private func uniqueSubdirectory() -> String {
+        "SwiftDTFTests/\(UUID().uuidString)"
+    }
+
+    private func rootTestDirectory(from subdirectory: String) -> String {
+        subdirectory.split(separator: "/").first.map(String.init) ?? subdirectory
+    }
+
+    private func cleanup(_ subdirectory: String) {
+        guard let directory = try? cachesDirectory().appendingPathComponent(subdirectory, isDirectory: true) else {
+            return
+        }
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    private func cachedFileURL(subdirectory: String, fileName: String, fileType: String) throws -> URL {
+        try cachesDirectory()
+            .appendingPathComponent(subdirectory, isDirectory: true)
+            .appendingPathComponent(fileName)
+            .appendingPathExtension(fileType)
+    }
+
+    private func cachesDirectory() throws -> URL {
+        guard let directory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
             throw DataToFile.Errors.invalidFilePath
         }
-        return documentsDirectory
-    }
-}
-
-// MARK: - Performance Tests
-
-@Suite struct SwiftDTFPerformanceTests {
-    let dataToFile = DataToFile.shared
-    
-    @Test("Performance test for file generation")
-    func testPerformanceGenerateFile() throws {
-        let largeData = Data(repeating: 0, count: 1024 * 1024) // 1MB
-        
-        let startTime = Date()
-        for i in 0..<10 {
-            _ = try dataToFile.generateFile(
-                data: largeData,
-                fileName: "performance_test_\(i)",
-                fileType: "dat"
-            )
-        }
-        let endTime = Date()
-        let duration = endTime.timeIntervalSince(startTime)
-        
-        // Clean up test files
-        for i in 0..<10 {
-            try? dataToFile.removeItem(fileName: "performance_test_\(i)", fileType: "dat")
-        }
-        
-        // Expect the operation to complete in reasonable time (less than 5 seconds for 10 iterations)
-        #expect(duration < 5.0)
-    }
-    
-    @Test("Performance test for data generation")
-    func testPerformanceGenerateData() throws {
-        // Create a file first
-        let largeData = Data(repeating: 0, count: 1024 * 1024) // 1MB
-        _ = try dataToFile.generateFile(
-            data: largeData,
-            fileName: "performance_read_test",
-            fileType: "dat"
-        )
-        
-        let startTime = Date()
-        for _ in 0..<10 {
-            _ = try dataToFile.generateData(from: "performance_read_test.dat")
-        }
-        let endTime = Date()
-        let duration = endTime.timeIntervalSince(startTime)
-        
-        // Clean up test file
-        try? dataToFile.removeItem(fileName: "performance_read_test", fileType: "dat")
-        
-        // Expect the operation to complete in reasonable time (less than 5 seconds for 10 iterations)
-        #expect(duration < 5.0)
+        return directory
     }
 }
